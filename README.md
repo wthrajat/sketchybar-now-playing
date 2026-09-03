@@ -20,18 +20,32 @@ idles at zero CPU and updates the bar the moment the track changes.
 
 * macOS 13 or later (tested on macOS 26)
 * [SketchyBar](https://github.com/FelixKratz/SketchyBar) installed and running
-* Rust 1.75 or later, only needed to build
+* Rust 1.75 or later, only for source builds
 * A Nerd Font in the bar config, only needed for the player icons
 
 ## Install
 
-Build the binary:
+Pick one. The one liner needs no Rust toolchain.
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/wthrajat/sketchybar-now-playing/main/install.sh | sh
+```
+
+With Rust installed:
+
+```sh
+cargo install sketchybar-now-playing
+```
+
+From source (also needs Rust 1.75 or later):
+
+```sh
+git clone https://github.com/wthrajat/sketchybar-now-playing.git
+cd sketchybar-now-playing
 cargo build --release
 ```
 
-Put it on your `PATH` with an atomic rename. Never copy over the
+Install the binary with an atomic rename. Never copy over the
 destination in place while the bar may be executing it, or macOS can
 refuse to launch that file path afterwards. `install` and `mv` are
 atomic. Bare `cp` onto a live path is not.
