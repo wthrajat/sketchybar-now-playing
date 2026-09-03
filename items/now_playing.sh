@@ -44,7 +44,8 @@ sketchybar --add event "$EVENT" \
   --subscribe now_playing "$EVENT" mouse.clicked
 
 # Start the daemon once (no-op if already running). The pgrep pattern
-# matches the bare name so it hits no matter which prefix resolved.
-if [ -n "$BIN" ] && ! pgrep -f "sketchybar-now-playing daemon" >/dev/null 2>&1; then
+# matches the bare name so it hits no matter which prefix resolved, and
+# the [s] trick keeps pgrep from matching this very script while it runs.
+if [ -n "$BIN" ] && ! pgrep -f "[s]ketchybar-now-playing daemon" >/dev/null 2>&1; then
   "$BIN" daemon --event "$EVENT" >/tmp/sketchybar-now-playing.log 2>&1 &
 fi

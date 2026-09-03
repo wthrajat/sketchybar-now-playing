@@ -2,9 +2,13 @@
 # now_playing.sh: SketchyBar item script (POSIX sh, no bashisms).
 # Env from SketchyBar: $NAME (item), $SENDER (event), plus trigger payload:
 #   $TITLE $ARTIST $ALBUM $BUNDLE $PLAYING $LABEL $ICON
-# Also handles `routine` ticks (polling fallback) via `get`.
+# Also handles `routine` ticks and mouse clicks.
 #
-# Dispatch is O(1) on $SENDER; every branch is a single `sketchybar --set`.
+# Optional env:
+#   NOW_PLAYING_BIN     explicit binary path (auto resolved when unset)
+#   NOW_PLAYING_CONFIG  config file forwarded to every invocation
+#
+# Dispatch is O(1) on $SENDER; every branch is a single action.
 
 # SketchyBar.app runs with a minimal PATH, so resolve the binary once:
 # explicit env wins, then PATH, then the common install prefixes.
@@ -21,6 +25,15 @@ if [ -z "$BIN" ]; then
     done
   fi
 fi
+
+# Thin wrapper so --config is honored without repeating the conditional.
+run_bin() {
+  if [ -n "$NOW_PLAYING_CONFIG" ]; then
+    "$BIN" --config "$NOW_PLAYING_CONFIG" "$@"
+  else
+    "$BIN" "$@"
+  fi
+}
 
 set_label() {
   # $1=label $2=icon $3=playing(true/false/"")
@@ -40,20 +53,17 @@ case "$SENDER" in
     # change event converges the bar, so no output parsing here.
     if [ -n "$BIN" ]; then
       if [ "${BUTTON:-left}" = "right" ]; then
-        "$BIN" next >/dev/null 2>&1
+        run_bin next >/dev/null 2>&1
       else
-        "$BIN" toggle >/dev/null 2>&1
+        run_bin toggle >/dev/null 2>&1
       fi
     fi
     ;;
   routine|forced|*)
-    # Polling fallback when the daemon is not running.
+    # Fallback and post reload convergence: pushes label, icon and
+    # visibility in one call, so the shell parses no output.
     if [ -n "$BIN" ]; then
-      OUT="$("$BIN" get 2>/dev/null)"
-      case "$OUT" in
-        ""|"No player available") sketchybar --set "$NAME" drawing=off ;;
-        *) sketchybar --set "$NAME" label="$OUT" drawing=on ;;
-      esac
+      run_bin sync "$NAME" >/dev/null 2>&1
     fi
     ;;
 esac

@@ -54,6 +54,44 @@ impl PerlMedia {
     }
 }
 
+impl Drop for PerlMedia {
+    /// Reap the adapter child. The crate's own `Drop` only flips its flag
+    /// while the reader thread blocks on the child's stdout, so without
+    /// this every short lived command (`get`, controls) would orphan one
+    /// `/usr/bin/perl` per run.
+    fn drop(&mut self) {
+        reap_adapter_children();
+    }
+}
+
+/// Kill leftover adapter helpers that are our own direct children.
+/// The PPID check keeps siblings and other apps untouched. Absolute tool
+/// paths so this also works under SketchyBar's minimal PATH. Best effort:
+/// cleanup must never fail shutdown.
+fn reap_adapter_children() {
+    let output = std::process::Command::new("/usr/bin/pgrep")
+        .args(["-f", "mediaremote-adapter\\.pl .* stream"])
+        .output();
+    let output = match output {
+        Ok(output) => output,
+        Err(_) => return,
+    };
+    let me = std::process::id().to_string();
+    let text = String::from_utf8_lossy(&output.stdout);
+    for pid in text.split_whitespace() {
+        let ppid = std::process::Command::new("/bin/ps")
+            .args(["-o", "ppid=", "-p", pid])
+            .output();
+        let is_ours = match ppid {
+            Ok(out) => String::from_utf8_lossy(&out.stdout).trim() == me,
+            Err(_) => false,
+        };
+        if is_ours {
+            let _ = std::process::Command::new("/bin/kill").args([pid]).output();
+        }
+    }
+}
+
 /// Convert the guard's borrowed info into an owned `Track`, then drop the
 /// guard before doing anything else. This keeps the critical section short.
 #[inline]

@@ -31,11 +31,14 @@ Build the binary:
 cargo build --release
 ```
 
-Put it on your `PATH`:
+Put it on your `PATH` with an atomic rename. Never copy over the
+destination in place while the bar may be executing it, or macOS can
+refuse to launch that file path afterwards. `install` and `mv` are
+atomic. Bare `cp` onto a live path is not.
 
 ```sh
 mkdir -p ~/.local/bin
-cp target/release/sketchybar-now-playing ~/.local/bin/
+install -m 755 target/release/sketchybar-now-playing ~/.local/bin/
 ```
 
 Confirm it sees your media (play something first):
@@ -108,7 +111,7 @@ sketchybar --add event now_playing_change \
     label.scroll_duration=100 \
   --subscribe now_playing now_playing_change mouse.clicked
 
-pgrep -f "sketchybar-now-playing daemon" >/dev/null 2>&1 || \
+pgrep -f "[s]ketchybar-now-playing daemon" >/dev/null 2>&1 || \
   "$BIN" daemon --event now_playing_change >>/tmp/sketchybar-now-playing.log 2>&1 &
 ```
 
@@ -127,7 +130,7 @@ once (the `pgrep` guard keeps reloads from stacking daemons):
 ```lua
 require("items.now_playing")
 
-sbar.exec("pgrep -f 'sketchybar-now-playing daemon' >/dev/null || "
+sbar.exec("pgrep -f '[s]ketchybar-now-playing daemon' >/dev/null || "
   .. "sketchybar-now-playing daemon >>/tmp/sketchybar-now-playing.log 2>&1 &")
 ```
 
@@ -142,6 +145,7 @@ The sourced wiring script reads these optional variables:
 | Variable          | Default              | Purpose                              |
 | ----------------- | -------------------- | ------------------------------------ |
 | `NOW_PLAYING_BIN` | auto resolved | Explicit binary path. Otherwise `PATH`, then `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` |
+| `NOW_PLAYING_CONFIG` | unset | Config file forwarded to every binary call |
 | `NOW_PLAYING_POS` | `right`              | Bar position of the item             |
 | `NOW_PLAYING_EVENT` | `now_playing_change` | Custom event name                  |
 | `NOW_PLAYING_MAX` | `20`                 | Chars before the label scrolls       |
@@ -150,7 +154,9 @@ The sourced wiring script reads these optional variables:
 
 When the daemon runs, the item updates through events and costs nothing
 while idle. If the daemon is ever absent, the same item falls back to
-`update_freq` polling through `get`, so the bar keeps working.
+`update_freq` polling through `sync`, which pushes label, icon and
+visibility in one call. The same call reconverges a freshly reloaded
+item within one tick.
 
 ## Configuration
 
@@ -182,6 +188,7 @@ player bundle id to a glyph and win over the built ins.
 | `stream`   | Print a JSON line per change, for pipes and scripts  |
 | `daemon`   | Push changes into SketchyBar in a loop               |
 | `daemon --set ITEM` | Update the item directly, no event needed   |
+| `sync ITEM`    | Snapshot once and push label, icon and visibility into ITEM |
 | `play`, `pause`, `toggle`, `next`, `prev` | Control playback |
 
 Every command accepts a global `--config PATH` flag.
@@ -199,7 +206,7 @@ on the default `PATH` inside SketchyBar.
 ## Verify the setup
 
 ```sh
-pgrep -f "sketchybar-now-playing daemon"   # daemon is running
+pgrep -f "[s]ketchybar-now-playing daemon"   # daemon is running
 sketchybar --query now_playing             # item exists
 tail -20 /tmp/sketchybar-now-playing.log   # daemon log is clean
 ```
@@ -239,7 +246,7 @@ Start the bar and retry.
 ```sh
 sketchybar --remove now_playing
 sketchybar --remove event now_playing_change
-pkill -f "sketchybar-now-playing daemon"
+pkill -f "[s]ketchybar-now-playing daemon"
 rm ~/.local/bin/sketchybar-now-playing
 rm ~/.config/sketchybar/plugins/now_playing.sh ~/.config/sketchybar/items/now_playing.sh
 ```

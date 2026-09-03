@@ -11,11 +11,23 @@ use cli::{Cli, Commands};
 use config::Config;
 use error::{Error, Result};
 use media::{MediaSource, PerlMedia};
-use std::{process::ExitCode, time::Duration};
+use std::{
+    process::ExitCode,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::RecvTimeoutError,
+        Arc,
+    },
+    time::Duration,
+};
 use track::Track;
 
 /// Budget for the adapter's first payload on one-shot paths.
 const FIRST_PAYLOAD_TIMEOUT: Duration = Duration::from_secs(2);
+/// Wake interval for the event loops. Carries no work and no allocation;
+/// it only lets a SIGTERM/SIGINT break the blocking receive promptly so
+/// `Drop` runs and the adapter child is reaped.
+const SHUTDOWN_POLL: Duration = Duration::from_millis(200);
 
 fn main() -> ExitCode {
     match run() {
@@ -32,10 +44,23 @@ fn run() -> Result<()> {
     let cfg = Config::load(cli.config.as_deref())?;
     let media = PerlMedia::new();
 
+    // Graceful SIGTERM/SIGINT: breaking the loops below drops `media`,
+    // which reaps the adapter child instead of orphaning it.
+    // (ctrlc installs infallibly; the flag is the only fallible path.)
+    let stop = Arc::new(AtomicBool::new(false));
+    {
+        let stop = Arc::clone(&stop);
+        ctrlc::set_handler(move || stop.store(true, Ordering::Relaxed));
+    }
+
     match cli.command {
         Commands::Get { json } => cmd_get(&media, &cfg, json),
-        Commands::Stream => cmd_stream(&media),
-        Commands::Daemon { event, set } => cmd_daemon(&media, &cfg, &event, set.as_deref()),
+        Commands::Stream => cmd_stream(&media, &stop),
+        Commands::Daemon { event, set } => cmd_daemon(&media, &cfg, &event, set.as_deref(), &stop),
+        Commands::Sync { item } => {
+            let track = media.snapshot_wait(FIRST_PAYLOAD_TIMEOUT);
+            sketchybar::set(&item, track.as_ref(), &cfg)
+        }
         Commands::Play => control(media.play(), "play"),
         Commands::Pause => control(media.pause(), "pause"),
         Commands::Toggle => control(media.toggle(), "toggle"),
@@ -67,13 +92,21 @@ fn cmd_get(media: &impl MediaSource, cfg: &Config, json: bool) -> Result<()> {
 
 /// NDJSON change feed. O(1) diff in the loop; unchanged callbacks are
 /// dropped without printing, keeping downstream `jq` pipes quiet.
-fn cmd_stream(media: &impl MediaSource) -> Result<()> {
+fn cmd_stream(media: &impl MediaSource, stop: &AtomicBool) -> Result<()> {
     let (tx, rx) = std::sync::mpsc::channel::<Option<Track>>();
     let _token = media.on_change(move |t| {
-        let _ = tx.send(t); // Receiver gone (SIGPIPE/shutdown) => drop silently.
+        let _ = tx.send(t); // Receiver gone (shutdown) => drop silently.
     });
     let mut last: Option<Track> = None;
-    for next in rx {
+    loop {
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        let next = match rx.recv_timeout(SHUTDOWN_POLL) {
+            Ok(next) => next,
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => break,
+        };
         let emit = match (&last, &next) {
             (None, None) => false,
             (None, Some(_)) | (Some(_), None) => true,
@@ -98,6 +131,7 @@ fn cmd_daemon(
     cfg: &Config,
     event: &str,
     set_item: Option<&str>,
+    stop: &AtomicBool,
 ) -> Result<()> {
     let notify = |track: Option<&Track>| -> Result<()> {
         match set_item {
@@ -114,7 +148,15 @@ fn cmd_daemon(
         let _ = tx.send(t);
     });
     let mut last = initial;
-    for next in rx {
+    loop {
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        let next = match rx.recv_timeout(SHUTDOWN_POLL) {
+            Ok(next) => next,
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => break,
+        };
         let changed = match (&last, &next) {
             (None, None) => false,
             (None, Some(_)) | (Some(_), None) => true,

@@ -9,7 +9,7 @@
 -- Then start the event daemon once (init.lua, guarded so reloads do
 -- not stack daemons):
 --
---   sbar.exec("pgrep -f 'sketchybar-now-playing daemon' >/dev/null || "
+--   sbar.exec("pgrep -f '[s]ketchybar-now-playing daemon' >/dev/null || "
 --     .. "sketchybar-now-playing daemon >>/tmp/sketchybar-now-playing.log 2>&1 &")
 
 -- sbar.exec inherits the bar's minimal PATH, so resolve the binary the
@@ -39,6 +39,16 @@ end
 local BIN = find_binary()
 local EVENT = "now_playing_change"
 
+-- Optional config file, forwarded to every invocation. Paths with a
+-- single quote are not supported here; use the shell plugin if needed.
+local CONFIG_FLAG = ""
+do
+  local config_path = os.getenv("NOW_PLAYING_CONFIG")
+  if config_path ~= nil and config_path ~= "" then
+    CONFIG_FLAG = " --config '" .. config_path .. "'"
+  end
+end
+
 sbar.add("event", EVENT)
 
 local now_playing = sbar.add("item", "now_playing", {
@@ -61,23 +71,17 @@ now_playing:subscribe(EVENT, function(env)
   end
 end)
 
--- Polling fallback: keeps the bar working when the daemon is absent.
+-- Polling fallback and post reload convergence. `sync` pushes label,
+-- icon and visibility in one call, so Lua parses no output.
 now_playing:subscribe("routine", function()
-  sbar.exec(BIN .. " get", function(result)
-    local text = result:gsub("%s+$", "")
-    if text == "" or text:match("^No player") then
-      now_playing:set({ drawing = false })
-    else
-      now_playing:set({ drawing = true, label = { string = text } })
-    end
-  end)
+  sbar.exec(BIN .. CONFIG_FLAG .. " sync now_playing")
 end)
 
 -- Left click toggles, right click skips to the next track.
 now_playing:subscribe("mouse.clicked", function(env)
   if env.BUTTON == "right" then
-    sbar.exec(BIN .. " next")
+    sbar.exec(BIN .. CONFIG_FLAG .. " next")
   else
-    sbar.exec(BIN .. " toggle")
+    sbar.exec(BIN .. CONFIG_FLAG .. " toggle")
   end
 end)
