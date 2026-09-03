@@ -55,10 +55,11 @@ local now_playing = sbar.add("item", "now_playing", {
   position = "right",
   update_freq = 10,
   scroll_texts = true,
-  label = { max_chars = 20, scroll_duration = 100 },
+  label = { max_chars = 40, scroll_duration = 100 },
 })
 
 -- Event path: the daemon pushes TITLE, ARTIST, LABEL, ICON, PLAYING.
+-- Scrolling follows playback so paused text sits still.
 now_playing:subscribe(EVENT, function(env)
   if env.LABEL == nil or env.LABEL == "" then
     now_playing:set({ drawing = false })
@@ -67,6 +68,7 @@ now_playing:subscribe(EVENT, function(env)
       drawing = true,
       label = { string = env.LABEL },
       icon = { string = env.ICON or "" },
+      scroll_texts = env.PLAYING == "true",
     })
   end
 end)

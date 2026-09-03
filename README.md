@@ -13,7 +13,7 @@ idles at zero CPU and updates the bar the moment the track changes.
 * Play, pause, toggle, next and previous controls
 * Left click toggles, right click skips to the next track
 * Hides itself when nothing plays (optional)
-* Native bar scrolling for long titles, no extra tooling
+* Native bar scrolling for long titles, frozen while paused
 * JSON output and a live change feed for scripting
 
 ## Requirements
@@ -121,7 +121,7 @@ sketchybar --add event now_playing_change \
     click_script="$PLUGIN_DIR/now_playing.sh" \
     update_freq=10 \
     scroll_texts=on \
-    label.max_chars=20 \
+    label.max_chars=40 \
     label.scroll_duration=100 \
   --subscribe now_playing now_playing_change mouse.clicked
 
@@ -162,7 +162,7 @@ The sourced wiring script reads these optional variables:
 | `NOW_PLAYING_CONFIG` | unset | Config file forwarded to every binary call |
 | `NOW_PLAYING_POS` | `right`              | Bar position of the item             |
 | `NOW_PLAYING_EVENT` | `now_playing_change` | Custom event name                  |
-| `NOW_PLAYING_MAX` | `20`                 | Chars before the label scrolls       |
+| `NOW_PLAYING_MAX` | `40`                 | Chars before the label scrolls       |
 
 ### Polling fallback
 

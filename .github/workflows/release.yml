@@ -1,0 +1,149 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.toml'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: macos-latest
+
+    env:
+      CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      is_new: ${{ steps.check_tag.outputs.is_new }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from Cargo.toml
+        id: version
+        run: |
+          VERSION=$(grep -A 100 '^\[package\]' Cargo.toml | grep -m1 '^version = ' | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "is_new=false" >> "$GITHUB_OUTPUT"
+            echo "Tag ${{ steps.version.outputs.tag }} already exists, skipping release."
+          else
+            echo "is_new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push tag
+        if: steps.check_tag.outputs.is_new == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Install Rust toolchain
+        if: steps.check_tag.outputs.is_new == 'true'
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Rust Cache
+        if: steps.check_tag.outputs.is_new == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+
+      - name: Build and validate
+        if: steps.check_tag.outputs.is_new == 'true'
+        run: cargo build --release --locked
+
+      - name: Publish to crates.io
+        if: steps.check_tag.outputs.is_new == 'true' && env.CRATES_IO_TOKEN != ''
+        run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: release
+    if: needs.release.outputs.is_new == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+          key: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Stage package
+        run: |
+          root="sketchybar-now-playing-${{ matrix.target }}"
+          mkdir -p "$root/bin" "$root/plugins" "$root/items"
+          install -m 755 "target/${{ matrix.target }}/release/sketchybar-now-playing" "$root/bin/"
+          install -m 644 plugins/now_playing.sh "$root/plugins/"
+          install -m 644 items/now_playing.sh items/now_playing.lua "$root/items/"
+          install -m 644 config.example.toml README.md LICENSE "$root/"
+          tar -czf "$root.tar.gz" "$root"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sketchybar-now-playing-${{ matrix.target }}
+          path: sketchybar-now-playing-*.tar.gz
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    needs: [release, build]
+    if: needs.release.outputs.is_new == 'true'
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          files: artifacts/*.tar.gz
+          generate_release_notes: true

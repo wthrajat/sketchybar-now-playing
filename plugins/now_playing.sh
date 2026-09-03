@@ -36,11 +36,13 @@ run_bin() {
 }
 
 set_label() {
-  # $1=label $2=icon $3=playing(true/false/"")
+  # $1=label $2=icon $3=playing ("true" scrolls, anything else stays put)
   if [ -z "$1" ]; then
     sketchybar --set "$NAME" drawing=off
+  elif [ "$3" = "true" ]; then
+    sketchybar --set "$NAME" label="$1" icon="$2" scroll_texts=on drawing=on
   else
-    sketchybar --set "$NAME" label="$1" icon="$2" drawing=on
+    sketchybar --set "$NAME" label="$1" icon="$2" scroll_texts=off drawing=on
   fi
 }
 

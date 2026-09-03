@@ -48,8 +48,15 @@ pub fn set(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
         Some(t) => {
             let label = t.label(&cfg.separator);
             let icon = icon_for_with_overrides(&cfg.icon_overrides, &t.bundle_id);
+            // Freeze the scroller while paused so idle text sits still.
+            let scroll = if t.playing {
+                "scroll_texts=on"
+            } else {
+                "scroll_texts=off"
+            };
             cmd.arg(format!("label={label}"))
                 .arg(format!("icon={icon}"))
+                .arg(scroll)
                 .arg("drawing=on");
         }
         None if cfg.hide_output => {

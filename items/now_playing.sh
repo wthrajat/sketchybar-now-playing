@@ -29,7 +29,7 @@ if [ -z "$BIN" ]; then
 fi
 POS="${NOW_PLAYING_POS:-right}"
 EVENT="${NOW_PLAYING_EVENT:-now_playing_change}"
-MAX="${NOW_PLAYING_MAX:-20}"
+MAX="${NOW_PLAYING_MAX:-40}"
 PLUGIN_DIR="$(cd "$(dirname "$0")/../plugins" && pwd)"
 
 sketchybar --add event "$EVENT" \
