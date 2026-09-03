@@ -21,7 +21,7 @@ if [ -z "$BIN" ]; then
   if command -v sketchybar-now-playing >/dev/null 2>&1; then
     BIN="sketchybar-now-playing"
   else
-    for dir in "$HOME/.local/bin" /opt/homebrew/bin /usr/local/bin; do
+    for dir in "$HOME/.cargo/bin" "$HOME/.local/bin" /opt/homebrew/bin /usr/local/bin; do
       if [ -x "$dir/sketchybar-now-playing" ]; then
         BIN="$dir/sketchybar-now-playing"
         break
@@ -52,23 +52,24 @@ add_main() {
 add_control() {
   # $1=suffix (prev|toggle|next) $2=initial icon. Label stays off: the
   # button is icon only. Same event/click plumbing as the main item;
-  # the plugin tells siblings apart via $NAME.
+  # the plugin tells siblings apart via $NAME. No update_freq: buttons
+  # are purely event driven, and the main item's `sync` tick fans out
+  # to them, so they converge without polling.
   sketchybar --add item "now_playing.$1" "$POS" \
     --set "now_playing.$1" \
       script="$PLUGIN_DIR/now_playing.sh" \
       click_script="$PLUGIN_DIR/now_playing.sh" \
-      update_freq=10 \
       label.drawing=off \
       icon="$2" \
     --subscribe "now_playing.$1" "$EVENT" mouse.clicked
 }
 
 add_sep() {
-  # The `|` between the label and the buttons. Not clickable.
+  # The `|` between the label and the buttons. Not clickable, never
+  # polled: same event plus fan-out convergence as the buttons.
   sketchybar --add item now_playing.sep "$POS" \
     --set now_playing.sep \
       script="$PLUGIN_DIR/now_playing.sh" \
-      update_freq=10 \
       label="|" \
       icon.drawing=off \
     --subscribe now_playing.sep "$EVENT"

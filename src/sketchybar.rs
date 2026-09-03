@@ -22,7 +22,18 @@ fn control_of(item: &str) -> Option<&str> {
         .copied()
 }
 
+/// Resolve the icon: explicit `static_icon` wins, otherwise the per
+/// player map. Borrowed either way, so the hot path stays allocation free.
+#[inline]
+fn resolve_icon<'a>(cfg: &'a Config, bundle_id: &str) -> &'a str {
+    cfg.static_icon
+        .as_deref()
+        .unwrap_or_else(|| icon_for_with_overrides(&cfg.icon_overrides, bundle_id))
+}
+
 /// Fire a custom event, e.g. `sketchybar --trigger now_playing_change ...`.
+/// Keys are uppercase by SketchyBar convention (`$NAME`, `$SENDER`), so the
+/// plugin reads `$TITLE`, `$LABEL`, `$ICON`, `$PLAYING` and friends.
 /// Keys are uppercase by SketchyBar convention (`$NAME`, `$SENDER`), so the
 /// plugin reads `$TITLE`, `$LABEL`, `$ICON`, `$PLAYING` and friends.
 /// `PREV_ICON` / `TOGGLE_ICON` / `NEXT_ICON` feed the optional control
@@ -36,7 +47,7 @@ pub fn trigger(event: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
     match track {
         Some(t) => {
             let label = t.label(&cfg.separator);
-            let icon = icon_for_with_overrides(&cfg.icon_overrides, &t.bundle_id);
+            let icon = resolve_icon(cfg, &t.bundle_id);
             let toggle = toggle_icon(t.playing);
             cmd.arg(format!("TITLE={}", t.title))
                 .arg(format!("ARTIST={}", t.artist))
@@ -81,7 +92,7 @@ pub fn set(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
     match track {
         Some(t) => {
             let label = t.label(&cfg.separator);
-            let icon = icon_for_with_overrides(&cfg.icon_overrides, &t.bundle_id);
+            let icon = resolve_icon(cfg, &t.bundle_id);
             // Freeze the scroller while paused so idle text sits still.
             let scroll = if t.playing {
                 "scroll_texts=on"

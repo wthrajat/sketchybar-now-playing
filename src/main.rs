@@ -58,8 +58,10 @@ fn run() -> Result<()> {
         Commands::Stream => cmd_stream(&media, &stop),
         Commands::Daemon { event, set } => cmd_daemon(&media, &cfg, &event, set.as_deref(), &stop),
         Commands::Sync { item } => {
+            // Fan out like daemon --set mode: one tick converges the base
+            // item plus any control siblings, so buttons need no polling.
             let track = media.snapshot_wait(FIRST_PAYLOAD_TIMEOUT);
-            sketchybar::set(&item, track.as_ref(), &cfg)
+            sketchybar::set_with_controls(&item, track.as_ref(), &cfg)
         }
         Commands::Play => control(media.play(), "play"),
         Commands::Pause => control(media.pause(), "pause"),

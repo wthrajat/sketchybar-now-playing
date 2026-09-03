@@ -192,7 +192,7 @@ The sourced wiring script reads these optional variables:
 
 | Variable          | Default              | Purpose                              |
 | ----------------- | -------------------- | ------------------------------------ |
-| `NOW_PLAYING_BIN` | auto resolved | Explicit binary path. Otherwise `PATH`, then `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` |
+| `NOW_PLAYING_BIN` | auto resolved | Explicit binary path. Otherwise `PATH`, then `~/.cargo/bin`, `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` |
 | `NOW_PLAYING_CONFIG` | unset | Config file forwarded to every binary call |
 | `NOW_PLAYING_POS` | `right`              | Bar position of the item             |
 | `NOW_PLAYING_EVENT` | `now_playing_change` | Custom event name                  |
@@ -219,14 +219,16 @@ cp config.example.toml ~/.config/sketchybar/now-playing.toml
 separator = " - "
 hide_output = false
 max_chars = 20
+# static_icon = ""
 
 [icons]
 "com.spotify.client" = ""
 ```
 
 `separator` joins the fields. `hide_output` hides the item instead of
-showing a placeholder when nothing plays. Entries under `[icons]` map a
-player bundle id to a glyph and win over the built ins. To always show
+showing a placeholder when nothing plays. `static_icon` pins one glyph
+for every player instead of the per player map. Entries under `[icons]`
+map a player bundle id to a glyph and win over the built ins. To always show
 the music note instead of the browser glyph (e.g. for Firefox tabs),
 override that bundle id:
 

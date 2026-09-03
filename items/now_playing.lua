@@ -23,6 +23,7 @@ local function find_binary()
   end
   local home = os.getenv("HOME") or ""
   local candidates = {
+    home .. "/.cargo/bin/sketchybar-now-playing",
     home .. "/.local/bin/sketchybar-now-playing",
     "/opt/homebrew/bin/sketchybar-now-playing",
     "/usr/local/bin/sketchybar-now-playing",
@@ -82,9 +83,10 @@ local control_defs = {
 
 if CONTROLS then
   for _, def in ipairs(control_defs) do
+    -- No update_freq and no routine tick: buttons are purely event
+    -- driven, and the main item's `sync` tick fans out to them.
     local button = sbar.add("item", def.name, {
       position = "right",
-      update_freq = 10,
       label = { drawing = false },
       icon = { string = def.glyph or ICON_PLAY },
     })
@@ -97,9 +99,6 @@ if CONTROLS then
         button:set({ drawing = true, icon = { string = def.glyph } })
       end
     end)
-    button:subscribe("routine", function()
-      sbar.exec(BIN .. CONFIG_FLAG .. " sync " .. def.name)
-    end)
     button:subscribe("mouse.clicked", function()
       sbar.exec(BIN .. CONFIG_FLAG .. " " .. def.action)
     end)
@@ -108,15 +107,11 @@ if CONTROLS then
   -- The `|` between the label and the buttons. Not clickable.
   local sep = sbar.add("item", "now_playing.sep", {
     position = "right",
-    update_freq = 10,
     label = { string = "|" },
     icon = { drawing = false },
   })
   sep:subscribe(EVENT, function(env)
     sep:set({ drawing = not (env.LABEL == nil or env.LABEL == "") })
-  end)
-  sep:subscribe("routine", function()
-    sbar.exec(BIN .. CONFIG_FLAG .. " sync now_playing.sep")
   end)
 end
 

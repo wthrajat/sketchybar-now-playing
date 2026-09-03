@@ -4,6 +4,9 @@ separator = " - "
 hide_output = false
 # Hint for label sizing; the bar itself truncates via `label.max_chars`.
 max_chars = 20
+# One glyph for every player, ignoring the per player map below.
+# Uncomment for a single static icon:
+# static_icon = ""
 
 # Per-player glyphs. Keys match against the client bundle id (exact first,
 # then substring). Built-ins already cover Spotify / Music / major browsers.

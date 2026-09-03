@@ -21,7 +21,7 @@ if [ -z "$BIN" ]; then
   if command -v sketchybar-now-playing >/dev/null 2>&1; then
     BIN="sketchybar-now-playing"
   else
-    for dir in "$HOME/.local/bin" /opt/homebrew/bin /usr/local/bin; do
+    for dir in "$HOME/.cargo/bin" "$HOME/.local/bin" /opt/homebrew/bin /usr/local/bin; do
       if [ -x "$dir/sketchybar-now-playing" ]; then
         BIN="$dir/sketchybar-now-playing"
         break
