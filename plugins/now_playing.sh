@@ -117,7 +117,9 @@ handle_click() {
       run_bin prev >/dev/null 2>&1
       ;;
     *.toggle)
-      run_bin toggle >/dev/null 2>&1
+      if run_bin toggle >/dev/null 2>&1; then
+        flip_scroll "$NAME"
+      fi
       ;;
     *.next)
       run_bin next >/dev/null 2>&1
@@ -125,11 +127,25 @@ handle_click() {
     *)
       if [ "${BUTTON:-left}" = "right" ]; then
         run_bin next >/dev/null 2>&1
-      else
-        run_bin toggle >/dev/null 2>&1
+      elif run_bin toggle >/dev/null 2>&1; then
+        flip_scroll "$NAME"
       fi
       ;;
   esac
+}
+
+flip_scroll() {
+  # $1=item. Optimistic scroll flip for toggle clicks: the system event
+  # confirming the new state can lag seconds behind (browsers especially),
+  # while the user's intent is known right now. The daemon's next event
+  # and the `sync` tick both carry ground truth, so a wrong guess (e.g.
+  # the player ignored the command) self corrects within seconds.
+  # The toggle glyph itself is left to the event: only motion disturbs.
+  if sketchybar --query "$1" 2>/dev/null | grep -q '"scroll_texts": *"on"'; then
+    sketchybar --set "$1" scroll_texts=off
+  else
+    sketchybar --set "$1" scroll_texts=on
+  fi
 }
 
 case "$SENDER" in

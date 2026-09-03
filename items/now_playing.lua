@@ -62,6 +62,12 @@ local ICON_NEXT = ""
 -- Set to 0 to keep the single track item with no transport buttons.
 local CONTROLS = os.getenv("NOW_PLAYING_CONTROLS") ~= "0"
 
+-- Last playback state from the event feed. Flipped optimistically on
+-- toggle clicks (the system confirmation can lag seconds behind) and
+-- corrected by the next event or `sync` tick. Long lived Lua state, so
+-- no query or state file is needed, unlike the shell plugin.
+local playing_state = true
+
 local function toggle_glyph(env)
   if env.TOGGLE_ICON ~= nil and env.TOGGLE_ICON ~= "" then
     return env.TOGGLE_ICON
@@ -101,6 +107,13 @@ if CONTROLS then
     end)
     button:subscribe("mouse.clicked", function()
       sbar.exec(BIN .. CONFIG_FLAG .. " " .. def.action)
+      if def.action == "toggle" then
+        -- `now_playing` is declared below; the upvalue resolves by the
+        -- time any click fires. Only the main label scrolls, so the
+        -- flip targets it, not the button.
+        playing_state = not playing_state
+        now_playing:set({ scroll_texts = playing_state })
+      end
     end)
   end
 
@@ -128,11 +141,12 @@ now_playing:subscribe(EVENT, function(env)
   if env.LABEL == nil or env.LABEL == "" then
     now_playing:set({ drawing = false })
   else
+    playing_state = (env.PLAYING == "true")
     now_playing:set({
       drawing = true,
       label = { string = env.LABEL },
       icon = { string = env.ICON or "" },
-      scroll_texts = env.PLAYING == "true",
+      scroll_texts = playing_state,
     })
   end
 end)
@@ -143,12 +157,15 @@ now_playing:subscribe("routine", function()
   sbar.exec(BIN .. CONFIG_FLAG .. " sync now_playing")
 end)
 
--- Left click toggles, right click skips to the next track.
+-- Left click toggles, right click skips to the next track. Toggle flips
+-- the scroller optimistically, same rationale as the shell plugin.
 now_playing:subscribe("mouse.clicked", function(env)
   if env.BUTTON == "right" then
     sbar.exec(BIN .. CONFIG_FLAG .. " next")
   else
     sbar.exec(BIN .. CONFIG_FLAG .. " toggle")
+    playing_state = not playing_state
+    now_playing:set({ scroll_texts = playing_state })
   end
 end)
 
