@@ -1,0 +1,9 @@
+# Build output
+/target/
+# macOS
+.DS_Store
+# SketchyBar runtime artefacts
+*.log
+# Local-only docs: publish README.md alone
+*.md
+!README.md

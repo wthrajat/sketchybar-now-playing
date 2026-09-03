@@ -1,0 +1,12 @@
+# Field joiner: title{separator}artist. Default is " - ".
+separator = " - "
+# Hide the item when nothing plays (drawing=off / empty line).
+hide_output = false
+# Hint for label sizing; the bar itself truncates via `label.max_chars`.
+max_chars = 20
+
+# Per-player glyphs. Keys match against the client bundle id (exact first,
+# then substring). Built-ins already cover Spotify / Music / major browsers.
+[icons]
+# "com.spotify.client" = ""
+# "com.apple.Safari" = ""

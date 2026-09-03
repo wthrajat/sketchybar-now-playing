@@ -1,0 +1,28 @@
+[package]
+name = "sketchybar-now-playing"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "macOS Now Playing (MediaRemote) for SketchyBar"
+license = "MIT"
+repository = "https://github.com/wthrajat/sketchybar-now-playing"
+readme = "README.md"
+keywords = ["macos", "sketchybar", "now-playing", "mediaremote", "status-bar"]
+categories = ["command-line-utilities", "os::macos-apis"]
+
+[[bin]]
+name = "sketchybar-now-playing"
+path = "src/main.rs"
+
+[dependencies]
+media-remote = { version = "0.5", default-features = false }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = 3
