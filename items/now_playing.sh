@@ -61,6 +61,8 @@ add_control() {
       click_script="$PLUGIN_DIR/now_playing.sh" \
       label.drawing=off \
       icon="$2" \
+      icon.padding_left=8 \
+      icon.padding_right=8 \
     --subscribe "now_playing.$1" "$EVENT" mouse.clicked
 }
 

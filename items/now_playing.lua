@@ -94,7 +94,7 @@ if CONTROLS then
     local button = sbar.add("item", def.name, {
       position = "right",
       label = { drawing = false },
-      icon = { string = def.glyph or ICON_PLAY },
+      icon = { string = def.glyph or ICON_PLAY, padding_left = 8, padding_right = 8 },
     })
     button:subscribe(EVENT, function(env)
       if env.LABEL == nil or env.LABEL == "" then
