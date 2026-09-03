@@ -4,6 +4,7 @@
 .DS_Store
 # SketchyBar runtime artefacts
 *.log
-# Local-only docs: publish README.md alone
+# Local-only docs: publish README.md plus docs/ alone
 *.md
 !README.md
+!docs/*.md

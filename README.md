@@ -1,5 +1,9 @@
 # sketchybar-now-playing
 
+[![crates.io](https://img.shields.io/crates/v/sketchybar-now-playing.svg)](https://crates.io/crates/sketchybar-now-playing)
+[![CI](https://github.com/wthrajat/sketchybar-now-playing/actions/workflows/ci.yml/badge.svg)](https://github.com/wthrajat/sketchybar-now-playing/actions/workflows/ci.yml)
+[![license](https://img.shields.io/crates/l/sketchybar-now-playing.svg)](https://github.com/wthrajat/sketchybar-now-playing/blob/main/LICENSE)
+
 Show what is playing on macOS in SketchyBar. Spotify, Apple Music,
 browser tabs with video or music, and anything else that appears in
 Control Center.
@@ -10,6 +14,8 @@ idles at zero CPU and updates the bar the moment the track changes.
 ## Features
 
 * Current title and artist in the bar, with a per player icon
+* Transport buttons `label | prev play/pause next`, each clickable
+  and grouped in one bracket pill
 * Play, pause, toggle, next and previous controls
 * Left click toggles, right click skips to the next track
 * Hides itself when nothing plays (optional)
@@ -25,35 +31,45 @@ idles at zero CPU and updates the bar the moment the track changes.
 
 ## Install
 
-Pick one. The one liner needs no Rust toolchain.
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/wthrajat/sketchybar-now-playing/main/install.sh | sh
-```
-
-With Rust installed:
+**Install** from crates.io:
 
 ```sh
 cargo install sketchybar-now-playing
 ```
 
-From source (also needs Rust 1.75 or later):
+**Update**:
+
+```sh
+cargo install sketchybar-now-playing --force
+```
+
+Or straight from GitHub (latest `main`, useful when crates.io lags behind):
+
+```sh
+cargo install --git https://github.com/wthrajat/sketchybar-now-playing --force
+```
+
+No Rust toolchain? Use the one liner with prebuilt binaries from the
+[releases page](https://github.com/wthrajat/sketchybar-now-playing/releases):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/wthrajat/sketchybar-now-playing/main/install.sh | sh
+```
+
+From source:
 
 ```sh
 git clone https://github.com/wthrajat/sketchybar-now-playing.git
 cd sketchybar-now-playing
-cargo build --release
+cargo build --release --locked
+mkdir -p ~/.local/bin
+install -m 755 target/release/sketchybar-now-playing ~/.local/bin/
 ```
 
 Install the binary with an atomic rename. Never copy over the
 destination in place while the bar may be executing it, or macOS can
 refuse to launch that file path afterwards. `install` and `mv` are
 atomic. Bare `cp` onto a live path is not.
-
-```sh
-mkdir -p ~/.local/bin
-install -m 755 target/release/sketchybar-now-playing ~/.local/bin/
-```
 
 Confirm it sees your media (play something first):
 
@@ -95,7 +111,25 @@ source "$HOME/.config/sketchybar/items/now_playing.sh"
 That one line does all of the following: it creates a custom
 `now_playing_change` event, adds a `now_playing` item on the right side,
 subscribes it to the event and to mouse clicks, enables native scrolling,
-and starts the daemon if it is not already running.
+and starts the daemon if it is not already running. It also adds the
+transport buttons (`now_playing.sep`, `.prev`, `.toggle`, `.next`) grouped
+in a `now_playing_bracket` pill, so the bar reads
+`♪ Title - Artist | ⏮ ▶ ⏭` with every button clickable. The play button
+follows playback and swaps between play and pause.
+
+To keep just the single track item with no buttons:
+
+```sh
+NOW_PLAYING_CONTROLS=0 source "$HOME/.config/sketchybar/items/now_playing.sh"
+```
+
+For the solid pill background from the screenshot, style the bracket once
+after sourcing:
+
+```sh
+sketchybar --set now_playing_bracket background.color=0xff2b3a55 \
+  background.corner_radius=6 background.height=26
+```
 
 ### 3. Reload the bar
 
@@ -163,6 +197,7 @@ The sourced wiring script reads these optional variables:
 | `NOW_PLAYING_POS` | `right`              | Bar position of the item             |
 | `NOW_PLAYING_EVENT` | `now_playing_change` | Custom event name                  |
 | `NOW_PLAYING_MAX` | `40`                 | Chars before the label scrolls       |
+| `NOW_PLAYING_CONTROLS` | `1`           | Set to `0` for the track item only, no transport buttons |
 
 ### Polling fallback
 
@@ -191,7 +226,14 @@ max_chars = 20
 
 `separator` joins the fields. `hide_output` hides the item instead of
 showing a placeholder when nothing plays. Entries under `[icons]` map a
-player bundle id to a glyph and win over the built ins.
+player bundle id to a glyph and win over the built ins. To always show
+the music note instead of the browser glyph (e.g. for Firefox tabs),
+override that bundle id:
+
+```toml
+[icons]
+"org.mozilla.firefox" = ""
+```
 
 ## Commands
 
@@ -211,70 +253,19 @@ Every command accepts a global `--config PATH` flag.
 
 | Click        | Action               |
 | ------------ | -------------------- |
-| Left         | Toggle play and pause |
-| Right        | Skip to next track   |
+| Left (label) | Toggle play and pause |
+| Right (label) | Skip to next track  |
+| Prev button  | Previous track       |
+| Play/pause button | Toggle play and pause |
+| Next button  | Skip to next track   |
 
 Set the binary location for clicks with `NOW_PLAYING_BIN` if it is not
 on the default `PATH` inside SketchyBar.
 
-## Verify the setup
+## Development
 
-```sh
-pgrep -f "[s]ketchybar-now-playing daemon"   # daemon is running
-sketchybar --query now_playing             # item exists
-tail -20 /tmp/sketchybar-now-playing.log   # daemon log is clean
-```
-
-To test the item without playing media, fire the event by hand:
-
-```sh
-sketchybar --trigger now_playing_change \
-  TITLE="Pearl Diver" ARTIST="777tv" LABEL="Pearl Diver - 777tv" PLAYING=true
-```
-
-## Troubleshooting
-
-Item never appears
-: Make sure the `source` line sits before the final
-`sketchybar --update` in `sketchybarrc`, then run `sketchybar --reload`.
-
-Bar shows `No player available` while media plays
-: Give the daemon a couple of seconds after starting. It waits for the
-first system payload on launch. Browser media also needs an active media
-session in the tab.
-
-Icons show as boxes
-: Install a Nerd Font and set it as the item font. Labels work with any
-font. Icons need the Nerd Font glyphs.
-
-Controls print `no active Now Playing client`
-: Nothing is loaded in any player. Open the player or tab first, then
-retry.
-
-Log shows `spawn sketchybar --set` failures
-: SketchyBar is not running, or the binary cannot find it on `PATH`.
-Start the bar and retry.
-
-## Uninstall
-
-```sh
-sketchybar --remove now_playing
-sketchybar --remove event now_playing_change
-pkill -f "[s]ketchybar-now-playing daemon"
-rm ~/.local/bin/sketchybar-now-playing
-rm ~/.config/sketchybar/plugins/now_playing.sh ~/.config/sketchybar/items/now_playing.sh
-```
-
-## How it works
-
-macOS exposes one global Now Playing state through the private
-MediaRemote framework. Since macOS 15.4 that API needs a special
-entitlement, so the binary reads it through the system `perl` loader,
-which keeps it working on current releases including macOS 26. The
-daemon subscribes to change notifications, compares the new snapshot
-with the previous one, and calls `sketchybar --trigger` only on real
-change. All SketchyBar calls use direct process execution with no
-shell, so track titles can never inject commands.
+Local setup, architecture, troubleshooting and the release process live
+in [docs/development.md](docs/development.md).
 
 ## License
 
