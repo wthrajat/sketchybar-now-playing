@@ -264,6 +264,29 @@ Every command accepts a global `--config PATH` flag.
 Set the binary location for clicks with `NOW_PLAYING_BIN` if it is not
 on the default `PATH` inside SketchyBar.
 
+## Performance
+
+Approximate footprint on Apple Silicon, macOS 26 (RSS includes shared
+system libraries, so private memory is lower):
+
+| Process | Memory |
+| ------- | ------ |
+| Daemon | ~16 MB |
+| Media helper (`perl` adapter) | ~23 MB |
+| **Steady state total** | **~39 MB** |
+| One `sync` tick (every 10s, lasts ~0.08s) | ~16 MB transient, ~0.01s CPU |
+
+Why it stays light:
+
+* Event driven. The daemon sleeps until MediaRemote reports a change,
+  so idle playback costs zero CPU.
+* One notification diff per change, O(1) field comparison, and the bar
+  is only touched when something actually changed.
+* Buttons never poll. The main item's single `sync` tick fans out to
+  them, replacing five timers with one.
+* One helper process exists per daemon, and it is reaped on exit, so
+  restarts never leak processes.
+
 ## Development
 
 Local setup, architecture, troubleshooting and the release process live
