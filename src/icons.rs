@@ -7,6 +7,24 @@ pub const ICON_SPOTIFY: &str = "\u{f1bc}"; //  spotify
 pub const ICON_BROWSER: &str = "\u{f269}"; //  browser
 pub const ICON_MUSIC: &str = "\u{f001}"; //  music note
 
+/// Transport control glyphs (previous, play, pause, next).
+/// Nerd Font glyphs, Unicode escaped to keep the source encoding-proof.
+pub const ICON_PREV: &str = "\u{f048}"; //  previous
+pub const ICON_PLAY: &str = "\u{f04b}"; //  play
+pub const ICON_PAUSE: &str = "\u{f04c}"; //  pause
+pub const ICON_NEXT: &str = "\u{f051}"; //  next
+
+/// Play/pause glyph for the toggle button. Shows pause while playing,
+/// play while paused.
+#[inline]
+pub fn toggle_icon(playing: bool) -> &'static str {
+    if playing {
+        ICON_PAUSE
+    } else {
+        ICON_PLAY
+    }
+}
+
 /// Map a client bundle id to its bar glyph. Zero alloc: returns `&'static`.
 /// Browsers share one glyph. A video title and a music track both arrive
 /// via the browser bundle id when played in a browser tab.
@@ -66,5 +84,11 @@ mod tests {
         assert_eq!(icon_for("com.apple.Safari"), ICON_BROWSER);
         assert_eq!(icon_for("com.apple.Music"), ICON_MUSIC);
         assert_eq!(icon_for("com.unknown.app"), ICON_DEFAULT);
+    }
+
+    #[test]
+    fn toggle_shows_pause_while_playing() {
+        assert_eq!(toggle_icon(true), ICON_PAUSE);
+        assert_eq!(toggle_icon(false), ICON_PLAY);
     }
 }

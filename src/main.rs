@@ -135,7 +135,9 @@ fn cmd_daemon(
 ) -> Result<()> {
     let notify = |track: Option<&Track>| -> Result<()> {
         match set_item {
-            Some(item) => sketchybar::set(item, track, cfg),
+            // Direct mode also fans out to the `.prev` / `.toggle` /
+            // `.next` / `.sep` siblings when they exist.
+            Some(item) => sketchybar::set_with_controls(item, track, cfg),
             None => sketchybar::trigger(event, track, cfg),
         }
     };

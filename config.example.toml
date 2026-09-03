@@ -10,3 +10,5 @@ max_chars = 20
 [icons]
 # "com.spotify.client" = ""
 # "com.apple.Safari" = ""
+# Always show the music note, even for browser tabs (e.g. Firefox):
+# "org.mozilla.firefox" = ""
