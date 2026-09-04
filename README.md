@@ -11,6 +11,8 @@ Control Center.
 One small Rust binary plus two shell scripts. It is event driven, so it
 idles at zero CPU and updates the bar the moment the track changes.
 
+![Demo](./public/assets/now-playing-demo.gif)
+
 ## Features
 
 * Current title and artist in the bar, with a per player icon

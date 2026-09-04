@@ -9,6 +9,7 @@ repository = "https://github.com/wthrajat/sketchybar-now-playing"
 readme = "README.md"
 keywords = ["macos", "sketchybar", "now-playing", "mediaremote", "status-bar"]
 categories = ["command-line-utilities", "os::macos-apis"]
+exclude = ["public/"]
 
 [[bin]]
 name = "sketchybar-now-playing"
