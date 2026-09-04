@@ -20,7 +20,7 @@ idles at zero CPU and updates the bar the moment the track changes.
   and grouped in one bracket pill
 * Play, pause, toggle, next and previous controls
 * Left click toggles, right click skips to the next track
-* Hides itself when nothing plays (optional)
+* Hides itself when nothing plays
 * Native bar scrolling for long titles, frozen while paused
 * JSON output and a live change feed for scripting
 
@@ -227,8 +227,9 @@ max_chars = 20
 "com.spotify.client" = ""
 ```
 
-`separator` joins the fields. `hide_output` hides the item instead of
-showing a placeholder when nothing plays. `static_icon` pins one glyph
+`separator` joins the fields. The bar item always hides when nothing
+plays. `hide_output` prints an empty line instead of a placeholder from
+`get` when nothing plays. `static_icon` pins one glyph
 for every player instead of the per player map. Entries under `[icons]`
 map a player bundle id to a glyph and win over the built ins. To always show
 the music note instead of the browser glyph (e.g. for Firefox tabs),

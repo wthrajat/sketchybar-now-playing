@@ -90,7 +90,7 @@ Item never appears
 : Make sure the `source` line sits before the final
 `sketchybar --update` in `sketchybarrc`, then run `sketchybar --reload`.
 
-Bar shows `No player available` while media plays
+Item stays hidden while media plays
 : Give the daemon a couple of seconds after starting. It waits for the
 first system payload on launch. Browser media also needs an active media
 session in the tab.

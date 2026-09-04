@@ -82,11 +82,8 @@ pub fn set(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
                 .arg(scroll)
                 .arg("drawing=on");
         }
-        None if cfg.hide_output => {
-            cmd.arg("drawing=off");
-        }
         None => {
-            cmd.arg("label=No player").arg("drawing=on");
+            cmd.arg("drawing=off");
         }
     }
     let status = cmd

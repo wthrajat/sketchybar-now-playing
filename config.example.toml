@@ -1,6 +1,7 @@
 # Field joiner: title{separator}artist. Default is " - ".
 separator = " - "
-# Hide the item when nothing plays (drawing=off / empty line).
+# Empty `get` output instead of a placeholder when nothing plays.
+# The bar item itself always hides (drawing=off) when idle.
 hide_output = false
 # Hint for label sizing; the bar itself truncates via `label.max_chars`.
 max_chars = 20
