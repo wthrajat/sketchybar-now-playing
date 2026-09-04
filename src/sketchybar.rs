@@ -6,14 +6,8 @@ use crate::{
 };
 use std::process::Command;
 
-/// Sibling control items created by `items/now_playing.sh` when controls
-/// are enabled. Each is a standalone bar item (`<base>.prev`,
-/// `<base>.toggle`, `<base>.next`, plus a `<base>.sep` pipe), so every
-/// button gets its own click target.
 const CONTROL_SUFFIXES: [&str; 4] = [".sep", ".prev", ".toggle", ".next"];
 
-/// Which control `item` is, if it is one. Matches on the trailing suffix
-/// only, so any base name works (`now_playing.prev`, `media.toggle`).
 #[inline]
 fn control_of(item: &str) -> Option<&str> {
     CONTROL_SUFFIXES
@@ -22,8 +16,6 @@ fn control_of(item: &str) -> Option<&str> {
         .copied()
 }
 
-/// Resolve the icon: explicit `static_icon` wins, otherwise the per
-/// player map. Borrowed either way, so the hot path stays allocation free.
 #[inline]
 fn resolve_icon<'a>(cfg: &'a Config, bundle_id: &str) -> &'a str {
     cfg.static_icon
@@ -31,16 +23,7 @@ fn resolve_icon<'a>(cfg: &'a Config, bundle_id: &str) -> &'a str {
         .unwrap_or_else(|| icon_for_with_overrides(&cfg.icon_overrides, bundle_id))
 }
 
-/// Fire a custom event, e.g. `sketchybar --trigger now_playing_change ...`.
-/// Keys are uppercase by SketchyBar convention (`$NAME`, `$SENDER`), so the
-/// plugin reads `$TITLE`, `$LABEL`, `$ICON`, `$PLAYING` and friends.
-/// Keys are uppercase by SketchyBar convention (`$NAME`, `$SENDER`), so the
-/// plugin reads `$TITLE`, `$LABEL`, `$ICON`, `$PLAYING` and friends.
-/// `PREV_ICON` / `TOGGLE_ICON` / `NEXT_ICON` feed the optional control
-/// items; `TOGGLE_ICON` follows playback (pause while playing). Extra keys
-/// are ignored by older plugins, so this stays backward compatible.
-/// Direct `exec` (no shell): values with spaces stay a single `KEY=value`
-/// arg, so track titles cannot inject commands.
+/// Fire a custom event. Uppercase keys; direct exec, no shell.
 pub fn trigger(event: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
     let mut cmd = Command::new("sketchybar");
     cmd.arg("--trigger").arg(event);
@@ -79,10 +62,6 @@ pub fn trigger(event: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
     }
 }
 
-/// Direct `--set` path for `daemon --set ITEM` (skips the event round-trip).
-/// Control items (`<base>.prev` / `.toggle` / `.next` / `.sep`) render just
-/// their icon or separator, so every subscribed item converges through the
-/// same polling fallback (`sync <name>`) with no shell parsing.
 pub fn set(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
     if let Some(kind) = control_of(item) {
         return set_control(item, kind, track);
@@ -93,7 +72,6 @@ pub fn set(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
         Some(t) => {
             let label = t.label(&cfg.separator);
             let icon = resolve_icon(cfg, &t.bundle_id);
-            // Freeze the scroller while paused so idle text sits still.
             let scroll = if t.playing {
                 "scroll_texts=on"
             } else {
@@ -121,16 +99,11 @@ pub fn set(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
     }
 }
 
-/// Update one control sibling. Controls are hidden whenever nothing plays,
-/// regardless of `hide_output`: a transport button with no player behind
-/// it would only ever error.
 fn set_control(item: &str, kind: &str, track: Option<&Track>) -> Result<()> {
     let mut cmd = Command::new("sketchybar");
     cmd.arg("--set").arg(item);
     match track {
         Some(t) => {
-            // `kind` is one of CONTROL_SUFFIXES; the wildcard keeps this
-            // total if the set ever grows (new buttons read as toggle).
             if kind == ".sep" {
                 cmd.arg("label=|").arg("icon.drawing=off");
             } else {
@@ -157,9 +130,6 @@ fn set_control(item: &str, kind: &str, track: Option<&Track>) -> Result<()> {
     }
 }
 
-/// `daemon --set` fan-out: update the main item, then push the same
-/// snapshot into the control siblings. Missing siblings (controls
-/// disabled) fail quietly; only the main item's result is reported.
 pub fn set_with_controls(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
     set(item, track, cfg)?;
     for suffix in CONTROL_SUFFIXES {

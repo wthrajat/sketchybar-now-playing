@@ -1,8 +1,5 @@
 use serde::Serialize;
 
-/// Point-in-time snapshot of the global Now Playing state.
-/// Owned `String`s: constructed once per change at the thread boundary,
-/// then shared by reference everywhere else (`&Track`, `&str`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Track {
     pub title: String,
@@ -15,9 +12,7 @@ pub struct Track {
 }
 
 impl Track {
-    /// Build from borrowed parts. Returns `None` when there is no usable
-    /// title. Titleless media is treated as invalid and maps to idle.
-    /// Trims once here so all downstream code can assume clean slices.
+    /// None when title is missing.
     pub fn from_parts(
         title: Option<&str>,
         artist: Option<&str>,
@@ -35,14 +30,11 @@ impl Track {
         })
     }
 
-    /// O(1) field comparison. The daemon re-emits only on real change.
     #[inline]
     pub fn changed(&self, other: &Self) -> bool {
         self != other
     }
 
-    /// Single-allocation `title{sep}artist` (or bare title when the artist
-    /// is empty). Capacity is exact, so no re-alloc on push.
     #[inline]
     pub fn label(&self, sep: &str) -> String {
         if self.artist.is_empty() {
@@ -55,7 +47,6 @@ impl Track {
         out
     }
 
-    /// Compact JSON line for `get --json` / `stream`.
     pub fn to_json_line(&self) -> crate::error::Result<String> {
         serde_json::to_string(self).map_err(crate::error::Error::from)
     }

@@ -1,17 +1,11 @@
 use std::fmt;
 
-/// Single error type for the binary. No `anyhow`; every failure maps here.
 #[derive(Debug)]
 pub enum Error {
-    /// Config file unreadable or invalid.
     Config(String),
-    /// MediaRemote backend failure (perl adapter, JXA, IPC).
     Media(String),
-    /// `sketchybar` binary failed to spawn or exited non-zero.
     SketchyBar(String),
-    /// Filesystem / process IO.
     Io(std::io::Error),
-    /// JSON encode failure (stream / get --json).
     Json(serde_json::Error),
 }
 

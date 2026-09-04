@@ -2,19 +2,13 @@ use crate::error::{Error, Result};
 use serde::Deserialize;
 use std::{collections::HashMap, path::Path};
 
-/// Runtime config. Scrolling stays native to SketchyBar
-/// (`scroll_texts`/`max_chars`), so only playback display knobs live here.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Joiner between fields, e.g. `" - "` gives `title - artist`.
     pub separator: String,
-    /// Hide the item (`drawing=off` / empty line) when nothing plays.
     pub hide_output: bool,
-    /// Hint for pre-sizing the label buffer; bar truncates via `max_chars`.
     pub max_chars: usize,
     pub icon_overrides: HashMap<String, String>,
-    /// Fixed glyph for every player. `None` keeps per player icons.
-    /// Empty strings count as unset so `static_icon = ""` stays default.
+    /// Fixed glyph for all players. Empty counts as unset.
     pub static_icon: Option<String>,
 }
 
@@ -30,7 +24,6 @@ impl Default for Config {
     }
 }
 
-/// Partial file form. Every field is optional so sparse TOML just works.
 #[derive(Debug, Default, Deserialize)]
 struct ConfigFile {
     separator: Option<String>,
@@ -42,16 +35,11 @@ struct ConfigFile {
 }
 
 impl Config {
-    /// Load from `path`, or probe the conventional location, or fall back
-    /// to built-in defaults. Probing means `sync` ticks inside SketchyBar
-    /// (which cannot receive env config) honor the same file as the daemon
-    /// without any extra plumbing. Single allocation per field; called once
-    /// at startup, never in the hot loop.
+    /// Explicit path, else ~/.config/sketchybar/now-playing.toml, else defaults.
     pub fn load(path: Option<&Path>) -> Result<Self> {
         if let Some(path) = path {
             return Self::load_file(path);
         }
-        // Conventional home config. Missing file or HOME is not an error.
         if let Some(home) = std::env::var_os("HOME") {
             let candidate =
                 std::path::PathBuf::from(home).join(".config/sketchybar/now-playing.toml");
