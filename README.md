@@ -1,8 +1,8 @@
 # sketchybar-now-playing
 
-[![crates.io](https://img.shields.io/crates/v/sketchybar-now-playing.svg)](https://crates.io/crates/sketchybar-now-playing)
+[![crates.io](https://img.shields.io/crates/v/sketchy-playing.svg)](https://crates.io/crates/sketchy-playing)
 [![CI](https://github.com/wthrajat/sketchybar-now-playing/actions/workflows/ci.yml/badge.svg)](https://github.com/wthrajat/sketchybar-now-playing/actions/workflows/ci.yml)
-[![license](https://img.shields.io/crates/l/sketchybar-now-playing.svg)](https://github.com/wthrajat/sketchybar-now-playing/blob/main/LICENSE)
+[![license](https://img.shields.io/crates/l/sketchy-playing.svg)](https://github.com/wthrajat/sketchybar-now-playing/blob/main/LICENSE)
 
 Show what is playing on macOS in SketchyBar. Spotify, Apple Music,
 browser tabs with video or music, and anything else that appears in
@@ -36,13 +36,13 @@ idles at zero CPU and updates the bar the moment the track changes.
 **Install** from crates.io:
 
 ```sh
-cargo install sketchybar-now-playing
+cargo install sketchy-playing
 ```
 
 **Update**:
 
 ```sh
-cargo install sketchybar-now-playing --force
+cargo install sketchy-playing --force
 ```
 
 Or straight from GitHub (latest `main`, useful when crates.io lags behind):
