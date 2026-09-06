@@ -272,26 +272,35 @@ on the default `PATH` inside SketchyBar.
 
 ## Performance
 
-Approximate footprint on Apple Silicon, macOS 26 (RSS includes shared
-system libraries, so private memory is lower):
+Measured live on Apple Silicon (`arm64`), macOS 26.3, daemon uptime 2+
+days with music playing. RSS includes shared system libraries; private
+(`top` MEM) is the unshared cost:
 
-| Process | Memory |
-| ------- | ------ |
-| Daemon | ~16 MB |
-| Media helper (`perl` adapter) | ~23 MB |
-| **Steady state total** | **~39 MB** |
-| One `sync` tick (every 10s, lasts ~0.08s) | ~16 MB transient, ~0.01s CPU |
+| Process | RSS | Private | CPU |
+| ------- | --- | ------- | --- |
+| Daemon | ~14.5 MB | ~3.9 MB | 0.0% (sampled and lifetime avg) |
+| Media helper (`perl` adapter) | ~19 MB | ~7.6 MB | 0.0% |
+| **Steady state total** | **~33 MB** | **~11.5 MB** | **~0%** |
+| One `get` snapshot (one-shot) | ~22 MB peak | ~3.3 MB own footprint | ~0.03s CPU, 0.09s wall |
+
+Binary: **1,200,880 bytes (~1.1 MiB)**, release build with LTO + `strip`.
 
 Why it stays light:
 
 * Event driven. The daemon sleeps until MediaRemote reports a change,
-  so idle playback costs zero CPU.
+  so steady state costs zero CPU.
+* The 10s `sync` tick is skipped while the daemon is alive (one `pgrep`
+  instead of a snapshot), so a healthy setup pays nothing between track
+  changes. It only polls as a fallback when the daemon is gone.
+* One `sketchybar` spawn covers the whole pill (label + 4 controls),
+  and bursts coalesce to the latest state, so scrubbing never causes a
+  spawn storm.
 * One notification diff per change, O(1) field comparison, and the bar
   is only touched when something actually changed.
 * Buttons never poll. The main item's single `sync` tick fans out to
   them, replacing five timers with one.
-* One helper process exists per daemon, and it is reaped on exit, so
-  restarts never leak processes.
+* One helper process exists per daemon, reaped in a single `pkill` on
+  exit, so restarts never leak processes.
 
 ## Development
 
