@@ -34,7 +34,8 @@ pub enum Commands {
     },
     /// Snapshot once and push it into ITEM via `sketchybar --set`.
     /// Powers the `update_freq` fallback so a (re)loaded item converges
-    /// label, icon and visibility in one call, with no shell parsing.
+    /// label, icon and scroll state in one call, freezing on idle instead
+    /// of hiding, with no shell parsing.
     Sync {
         /// Bar item to update.
         item: String,

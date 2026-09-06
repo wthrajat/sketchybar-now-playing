@@ -62,11 +62,12 @@ pub fn trigger(event: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
     }
 }
 
-pub fn set(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
+#[inline]
+fn push_set(cmd: &mut Command, item: &str, track: Option<&Track>, cfg: &Config) {
     if let Some(kind) = control_of(item) {
-        return set_control(item, kind, track);
+        push_set_control(cmd, item, kind, track);
+        return;
     }
-    let mut cmd = Command::new("sketchybar");
     cmd.arg("--set").arg(item);
     match track {
         Some(t) => {
@@ -83,21 +84,16 @@ pub fn set(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
                 .arg("drawing=on");
         }
         None => {
-            cmd.arg("drawing=off");
+            // Sticky last track: never clear label/icon or hide. Only stop
+            // motion; scroll strictly follows `playing`. No `drawing`
+            // change preserves hidden-until-first-play.
+            cmd.arg("scroll_texts=off");
         }
-    }
-    let status = cmd
-        .status()
-        .map_err(|e| Error::SketchyBar(format!("spawn sketchybar --set: {e}")))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(Error::SketchyBar(format!("--set exited with {status}")))
     }
 }
 
-fn set_control(item: &str, kind: &str, track: Option<&Track>) -> Result<()> {
-    let mut cmd = Command::new("sketchybar");
+#[inline]
+fn push_set_control(cmd: &mut Command, item: &str, kind: &str, track: Option<&Track>) {
     cmd.arg("--set").arg(item);
     match track {
         Some(t) => {
@@ -114,24 +110,49 @@ fn set_control(item: &str, kind: &str, track: Option<&Track>) -> Result<()> {
             cmd.arg("drawing=on");
         }
         None => {
-            cmd.arg("drawing=off");
+            // Idle: keep the last track visible, freeze motion, park the
+            // toggle on play. Glyphs refresh to the paused set but `drawing`
+            // is untouched so a never-shown bar stays hidden and a shown
+            // bar stays shown.
+            if kind == ".sep" {
+                cmd.arg("label=|").arg("icon.drawing=off");
+            } else {
+                let icon = match kind {
+                    ".prev" => ICON_PREV,
+                    ".next" => ICON_NEXT,
+                    _ => toggle_icon(false),
+                };
+                cmd.arg(format!("icon={icon}")).arg("label.drawing=off");
+            }
         }
     }
+}
+
+#[inline]
+fn spawn(mut cmd: Command, what: &str) -> Result<()> {
     let status = cmd
         .status()
-        .map_err(|e| Error::SketchyBar(format!("spawn sketchybar --set: {e}")))?;
+        .map_err(|e| Error::SketchyBar(format!("spawn sketchybar {what}: {e}")))?;
     if status.success() {
         Ok(())
     } else {
-        Err(Error::SketchyBar(format!("--set exited with {status}")))
+        Err(Error::SketchyBar(format!("{what} exited with {status}")))
     }
 }
 
 pub fn set_with_controls(item: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
-    set(item, track, cfg)?;
+    // One `sketchybar` spawn covers the whole pill: five separate spawns
+    // per `sync` tick (every 10s) and per `--set` daemon event cost five
+    // forks plus five transient bar IPC round trips.
+    let base = CONTROL_SUFFIXES
+        .iter()
+        .find_map(|suffix| item.strip_suffix(*suffix))
+        .unwrap_or(item);
+    let mut cmd = Command::new("sketchybar");
+    push_set(&mut cmd, base, track, cfg);
     for suffix in CONTROL_SUFFIXES {
-        let sibling = format!("{item}{suffix}");
-        let _ = set(&sibling, track, cfg);
+        let sibling = format!("{base}{suffix}");
+        push_set_control(&mut cmd, &sibling, suffix, track);
     }
-    Ok(())
+    spawn(cmd, "--set")
 }

@@ -56,7 +56,8 @@ luac -p items/now_playing.lua
 Event flow: the daemon subscribes to MediaRemote notifications, diffs
 each snapshot against the previous one, and calls
 `sketchybar --trigger` only on real change. The `update_freq` fallback
-calls `sync`, which pushes label, icon and visibility in one call.
+calls `sync`, which pushes label, icon and scroll state in one call,
+freezing on idle instead of hiding.
 
 ## How it works
 

@@ -23,7 +23,7 @@ use std::{
 use track::Track;
 
 const FIRST_PAYLOAD_TIMEOUT: Duration = Duration::from_secs(2);
-const SHUTDOWN_POLL: Duration = Duration::from_millis(200);
+const SHUTDOWN_POLL: Duration = Duration::from_millis(500);
 
 fn main() -> ExitCode {
     match run() {
@@ -68,6 +68,16 @@ fn control(ok: bool, action: &str) -> Result<()> {
         .ok_or_else(|| Error::Media(format!("{action} failed: no active Now Playing client")))
 }
 
+/// O(1) level diff: None↔Some always emits, Some↔Some compares fields.
+#[inline]
+fn track_changed(last: &Option<Track>, next: &Option<Track>) -> bool {
+    match (last, next) {
+        (None, None) => false,
+        (None, Some(_)) | (Some(_), None) => true,
+        (Some(a), Some(b)) => a.changed(b),
+    }
+}
+
 fn cmd_get(media: &impl MediaSource, cfg: &Config, json: bool) -> Result<()> {
     let track = media.snapshot_wait(FIRST_PAYLOAD_TIMEOUT);
     match (track.as_ref(), json) {
@@ -95,11 +105,7 @@ fn cmd_stream(media: &impl MediaSource, stop: &AtomicBool) -> Result<()> {
             Err(RecvTimeoutError::Timeout) => continue,
             Err(RecvTimeoutError::Disconnected) => break,
         };
-        let emit = match (&last, &next) {
-            (None, None) => false,
-            (None, Some(_)) | (Some(_), None) => true,
-            (Some(a), Some(b)) => a.changed(b),
-        };
+        let emit = track_changed(&last, &next);
         last = next;
         if !emit {
             continue;
@@ -137,17 +143,19 @@ fn cmd_daemon(
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        let next = match rx.recv_timeout(SHUTDOWN_POLL) {
+        let mut next = match rx.recv_timeout(SHUTDOWN_POLL) {
             Ok(next) => next,
             Err(RecvTimeoutError::Timeout) => continue,
             Err(RecvTimeoutError::Disconnected) => break,
         };
-        let changed = match (&last, &next) {
-            (None, None) => false,
-            (None, Some(_)) | (Some(_), None) => true,
-            (Some(a), Some(b)) => a.changed(b),
-        };
-        if !changed {
+        // Coalesce bursts (scrubbing, seek spam) to the latest state: the
+        // bar is level-triggered, so intermediate snapshots would only cost
+        // extra `sketchybar` spawns for frames nobody ever sees. `stream`
+        // intentionally keeps every line, so this stays daemon-only.
+        while let Ok(newer) = rx.try_recv() {
+            next = newer;
+        }
+        if !track_changed(&last, &next) {
             continue;
         }
         notify(next.as_ref())?;

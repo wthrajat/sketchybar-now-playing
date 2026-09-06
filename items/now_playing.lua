@@ -62,11 +62,11 @@ local ICON_NEXT = ""
 -- Set to 0 to keep the single track item with no transport buttons.
 local CONTROLS = os.getenv("NOW_PLAYING_CONTROLS") ~= "0"
 
--- Last playback state from the event feed. Flipped optimistically on
--- toggle clicks (the system confirmation can lag seconds behind) and
--- corrected by the next event or `sync` tick. Long lived Lua state, so
--- no query or state file is needed, unlike the shell plugin.
-local playing_state = true
+-- Last playback state from the event feed. Ground truth only: updated on
+-- each event, never flipped on click, so `scroll_texts` strictly follows
+-- PLAYING. Long lived Lua state, so no query or state file is needed,
+-- unlike the shell plugin.
+local playing_state = false
 
 local function toggle_glyph(env)
   if env.TOGGLE_ICON ~= nil and env.TOGGLE_ICON ~= "" then
@@ -91,14 +91,21 @@ if CONTROLS then
   for _, def in ipairs(control_defs) do
     -- No update_freq and no routine tick: buttons are purely event
     -- driven, and the main item's `sync` tick fans out to them.
+    -- Starts hidden; the first track reveals it, idle never hides it.
     local button = sbar.add("item", def.name, {
       position = "right",
+      drawing = false,
       label = { drawing = false },
       icon = { string = def.glyph or ICON_PLAY, padding_left = 8, padding_right = 8 },
     })
     button:subscribe(EVENT, function(env)
+      -- Sticky last track: empty LABEL means idle. Refresh the toggle
+      -- glyph to the paused set but leave `drawing` untouched, so a shown
+      -- bar stays shown frozen and a never-shown bar stays hidden.
       if env.LABEL == nil or env.LABEL == "" then
-        button:set({ drawing = false })
+        if def.glyph == nil then
+          button:set({ icon = { string = toggle_glyph(env) } })
+        end
       elseif def.glyph == nil then
         button:set({ drawing = true, icon = { string = toggle_glyph(env) } })
       else
@@ -106,40 +113,43 @@ if CONTROLS then
       end
     end)
     button:subscribe("mouse.clicked", function()
+      -- No optimistic scroll flip: scroll strictly follows PLAYING from
+      -- the event feed and the `sync` tick.
       sbar.exec(BIN .. CONFIG_FLAG .. " " .. def.action)
-      if def.action == "toggle" then
-        -- `now_playing` is declared below; the upvalue resolves by the
-        -- time any click fires. Only the main label scrolls, so the
-        -- flip targets it, not the button.
-        playing_state = not playing_state
-        now_playing:set({ scroll_texts = playing_state })
-      end
     end)
   end
 
   -- The `|` between the label and the buttons. Not clickable.
+  -- Starts hidden; idle leaves it exactly as-is.
   local sep = sbar.add("item", "now_playing.sep", {
     position = "right",
+    drawing = false,
     label = { string = "|" },
     icon = { drawing = false },
   })
   sep:subscribe(EVENT, function(env)
-    sep:set({ drawing = not (env.LABEL == nil or env.LABEL == "") })
+    if not (env.LABEL == nil or env.LABEL == "") then
+      sep:set({ drawing = true })
+    end
   end)
 end
 
 local now_playing = sbar.add("item", "now_playing", {
   position = "right",
+  drawing = false,
   update_freq = 10,
-  scroll_texts = true,
+  scroll_texts = false,
   label = { max_chars = 40, scroll_duration = 100 },
 })
 
 -- Event path: the daemon pushes TITLE, ARTIST, LABEL, ICON, PLAYING.
--- Scrolling follows playback so paused text sits still.
+-- Scrolling strictly follows playback: on only while playing, off while
+-- paused or idle. Empty LABEL means idle: keep the last label/icon,
+-- only stop motion, no `drawing` change (hidden-until-first-play).
 now_playing:subscribe(EVENT, function(env)
   if env.LABEL == nil or env.LABEL == "" then
-    now_playing:set({ drawing = false })
+    playing_state = false
+    now_playing:set({ scroll_texts = false })
   else
     playing_state = (env.PLAYING == "true")
     now_playing:set({
@@ -151,21 +161,26 @@ now_playing:subscribe(EVENT, function(env)
   end
 end)
 
--- Polling fallback and post reload convergence. `sync` pushes label,
--- icon and visibility in one call, so Lua parses no output.
+-- Polling fallback and post reload convergence. The periodic tick skips
+-- the heavy `sync` (binary + perl adapter + bar update) while the event
+-- daemon is alive: one `pgrep` instead of a full snapshot. Falls back to
+-- polling the moment the daemon is gone.
 now_playing:subscribe("routine", function()
-  sbar.exec(BIN .. CONFIG_FLAG .. " sync now_playing")
+  sbar.exec("pgrep -f '[s]ketchybar-now-playing daemon' >/dev/null 2>&1 || "
+    .. BIN .. CONFIG_FLAG .. " sync now_playing")
 end)
 
--- Left click toggles, right click skips to the next track. Toggle flips
--- the scroller optimistically, same rationale as the shell plugin.
+-- One immediate convergence at load so a reloaded bar with a live daemon
+-- shows the current track without waiting one `update_freq` period.
+sbar.exec(BIN .. CONFIG_FLAG .. " sync now_playing")
+
+-- Left click toggles, right click skips to the next track. No optimistic
+-- scroll flip here either: the event confirms the new PLAYING state.
 now_playing:subscribe("mouse.clicked", function(env)
   if env.BUTTON == "right" then
     sbar.exec(BIN .. CONFIG_FLAG .. " next")
   else
     sbar.exec(BIN .. CONFIG_FLAG .. " toggle")
-    playing_state = not playing_state
-    now_playing:set({ scroll_texts = playing_state })
   end
 end)
 

@@ -38,12 +38,16 @@ PLUGIN_DIR="$(cd "$(dirname "$0")/../plugins" && pwd)"
 sketchybar --add event "$EVENT"
 
 add_main() {
+  # Starts hidden and still: hidden-until-first-track, and `scroll_texts`
+  # strictly follows PLAYING (on only while playing). The event and the
+  # `sync` tick reveal (drawing=on) and animate it.
   sketchybar --add item now_playing "$POS" \
     --set now_playing \
       script="$PLUGIN_DIR/now_playing.sh" \
       click_script="$PLUGIN_DIR/now_playing.sh" \
       update_freq=10 \
-      scroll_texts=on \
+      scroll_texts=off \
+      drawing=off \
       label.max_chars="$MAX" \
       label.scroll_duration=100 \
     --subscribe now_playing "$EVENT" mouse.clicked
@@ -54,11 +58,13 @@ add_control() {
   # button is icon only. Same event/click plumbing as the main item;
   # the plugin tells siblings apart via $NAME. No update_freq: buttons
   # are purely event driven, and the main item's `sync` tick fans out
-  # to them, so they converge without polling.
+  # to them, so they converge without polling. Starts hidden; the first
+  # track reveals it, idle never hides it again.
   sketchybar --add item "now_playing.$1" "$POS" \
     --set "now_playing.$1" \
       script="$PLUGIN_DIR/now_playing.sh" \
       click_script="$PLUGIN_DIR/now_playing.sh" \
+      drawing=off \
       label.drawing=off \
       icon="$2" \
       icon.padding_left=8 \
@@ -69,9 +75,11 @@ add_control() {
 add_sep() {
   # The `|` between the label and the buttons. Not clickable, never
   # polled: same event plus fan-out convergence as the buttons.
+  # Starts hidden; idle leaves it as-is.
   sketchybar --add item now_playing.sep "$POS" \
     --set now_playing.sep \
       script="$PLUGIN_DIR/now_playing.sh" \
+      drawing=off \
       label="|" \
       icon.drawing=off \
     --subscribe now_playing.sep "$EVENT"

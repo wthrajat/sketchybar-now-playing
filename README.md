@@ -20,8 +20,9 @@ idles at zero CPU and updates the bar the moment the track changes.
   and grouped in one bracket pill
 * Play, pause, toggle, next and previous controls
 * Left click toggles, right click skips to the next track
-* Hides itself when nothing plays
-* Native bar scrolling for long titles, frozen while paused
+* Sticky last track: hidden until the first track, then keeps showing it
+  frozen when idle, never hiding again
+* Native bar scrolling for long titles, on only while playing
 * JSON output and a live change feed for scripting
 
 ## Requirements
@@ -156,7 +157,8 @@ sketchybar --add event now_playing_change \
     script="$PLUGIN_DIR/now_playing.sh" \
     click_script="$PLUGIN_DIR/now_playing.sh" \
     update_freq=10 \
-    scroll_texts=on \
+    scroll_texts=off \
+    drawing=off \
     label.max_chars=40 \
     label.scroll_duration=100 \
   --subscribe now_playing now_playing_change mouse.clicked
@@ -206,8 +208,8 @@ The sourced wiring script reads these optional variables:
 When the daemon runs, the item updates through events and costs nothing
 while idle. If the daemon is ever absent, the same item falls back to
 `update_freq` polling through `sync`, which pushes label, icon and
-visibility in one call. The same call reconverges a freshly reloaded
-item within one tick.
+scroll state in one call, freezing on idle instead of hiding. The same
+call reconverges a freshly reloaded item within one tick.
 
 ## Configuration
 
@@ -227,8 +229,9 @@ max_chars = 20
 "com.spotify.client" = ""
 ```
 
-`separator` joins the fields. The bar item always hides when nothing
-plays. `hide_output` prints an empty line instead of a placeholder from
+`separator` joins the fields. The bar item is sticky: hidden until the
+first track, then it keeps the last track frozen (`scroll_texts=off`,
+toggle parked on play) when idle. `hide_output` prints an empty line instead of a placeholder from
 `get` when nothing plays. `static_icon` pins one glyph
 for every player instead of the per player map. Entries under `[icons]`
 map a player bundle id to a glyph and win over the built ins. To always show
@@ -249,7 +252,7 @@ override that bundle id:
 | `stream`   | Print a JSON line per change, for pipes and scripts  |
 | `daemon`   | Push changes into SketchyBar in a loop               |
 | `daemon --set ITEM` | Update the item directly, no event needed   |
-| `sync ITEM`    | Snapshot once and push label, icon and visibility into ITEM |
+| `sync ITEM`    | Snapshot once and push label, icon and scroll state into ITEM |
 | `play`, `pause`, `toggle`, `next`, `prev` | Control playback |
 
 Every command accepts a global `--config PATH` flag.

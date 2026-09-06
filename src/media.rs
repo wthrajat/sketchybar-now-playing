@@ -46,29 +46,15 @@ impl Drop for PerlMedia {
     }
 }
 
-/// Kill our own adapter children only (PPID check). Best effort.
+/// Kill our own adapter children only (PPID match). Best effort: a single
+/// `pkill` instead of a `pgrep` + N x (`ps` + `kill`) round trip, so every
+/// short-lived exit (`sync` ticks every 10s, clicks) pays one spawn.
+/// Exit status ignored: 1 just means no children, the common case.
 fn reap_adapter_children() {
-    let output = std::process::Command::new("/usr/bin/pgrep")
-        .args(["-f", "mediaremote-adapter\\.pl .* stream"])
-        .output();
-    let output = match output {
-        Ok(output) => output,
-        Err(_) => return,
-    };
     let me = std::process::id().to_string();
-    let text = String::from_utf8_lossy(&output.stdout);
-    for pid in text.split_whitespace() {
-        let ppid = std::process::Command::new("/bin/ps")
-            .args(["-o", "ppid=", "-p", pid])
-            .output();
-        let is_ours = match ppid {
-            Ok(out) => String::from_utf8_lossy(&out.stdout).trim() == me,
-            Err(_) => false,
-        };
-        if is_ours {
-            let _ = std::process::Command::new("/bin/kill").args([pid]).output();
-        }
-    }
+    let _ = std::process::Command::new("/usr/bin/pkill")
+        .args(["-P", &me, "-f", "mediaremote-adapter\\.pl .* stream"])
+        .output();
 }
 
 #[inline]
