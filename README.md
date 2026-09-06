@@ -301,6 +301,9 @@ Why it stays light:
   them, replacing five timers with one.
 * One helper process exists per daemon, reaped in a single `pkill` on
   exit, so restarts never leak processes.
+* Singleton per feed: a second daemon for the same event/item exits
+  immediately instead of doubling memory (~33 MB) and firing every bar
+  trigger twice.
 
 ## Development
 

@@ -38,6 +38,8 @@ luac -p items/now_playing.lua
 * `src/media.rs`: `MediaSource` trait plus the `NowPlayingPerl`
   backend. `Drop` reaps the helper process so short lived commands
   never orphan it.
+* `src/lock.rs`: per-feed singleton lock (`$TMPDIR`) so a second
+  `daemon` for the same event/item exits before spawning anything.
 * `src/sketchybar.rs`: `trigger`, `set` and `sync` via direct exec,
   no shell. `trigger` also carries `PREV/TOGGLE/NEXT_ICON`; `set`
   renders `<base>.prev` / `.toggle` / `.next` / `.sep` control items

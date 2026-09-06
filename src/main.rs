@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod error;
 mod icons;
+mod lock;
 mod media;
 mod sketchybar;
 mod track;
@@ -38,6 +39,19 @@ fn main() -> ExitCode {
 fn run() -> Result<()> {
     let cli = Cli::parse();
     let cfg = Config::load(cli.config.as_deref())?;
+    // Singleton per feed: a second daemon for the same `--event` / `--set`
+    // target exits here, before spawning the perl helper. Stale locks from
+    // dead owners are taken over transparently.
+    let _daemon_lock = match &cli.command {
+        Commands::Daemon { event, set } => match lock::acquire_daemon(event, set.as_deref())? {
+            Some(guard) => Some(guard),
+            None => {
+                eprintln!("sketchybar-now-playing: daemon already running for this feed");
+                return Ok(());
+            }
+        },
+        _ => None,
+    };
     let media = PerlMedia::new();
 
     let stop = Arc::new(AtomicBool::new(false));
@@ -46,13 +60,13 @@ fn run() -> Result<()> {
         ctrlc::set_handler(move || stop.store(true, Ordering::Relaxed));
     }
 
-    match cli.command {
-        Commands::Get { json } => cmd_get(&media, &cfg, json),
+    match &cli.command {
+        Commands::Get { json } => cmd_get(&media, &cfg, *json),
         Commands::Stream => cmd_stream(&media, &stop),
-        Commands::Daemon { event, set } => cmd_daemon(&media, &cfg, &event, set.as_deref(), &stop),
+        Commands::Daemon { event, set } => cmd_daemon(&media, &cfg, event, set.as_deref(), &stop),
         Commands::Sync { item } => {
             let track = media.snapshot_wait(FIRST_PAYLOAD_TIMEOUT);
-            sketchybar::set_with_controls(&item, track.as_ref(), &cfg)
+            sketchybar::set_with_controls(item, track.as_ref(), &cfg)
         }
         Commands::Play => control(media.play(), "play"),
         Commands::Pause => control(media.pause(), "pause"),
