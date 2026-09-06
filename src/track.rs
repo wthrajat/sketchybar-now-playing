@@ -1,5 +1,11 @@
 use serde::Serialize;
 
+/// Idle fallback text shown when no player exists. Paused tracks still show
+/// the real (frozen) entry; only true idle maps here. Keep in sync with the
+/// `PLACEHOLDER` constants in `plugins/now_playing.sh`,
+/// `items/now_playing.sh` and `items/now_playing.lua`.
+pub const PLACEHOLDER_TITLE: &str = "Play Something";
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Track {
     pub title: String,
@@ -33,6 +39,19 @@ impl Track {
     #[inline]
     pub fn changed(&self, other: &Self) -> bool {
         self != other
+    }
+
+    /// Paused, empty-credit entry rendered through the normal path, so the
+    /// idle pill reuses the standard icon, toggle glyph and visibility.
+    #[inline]
+    pub fn placeholder() -> Self {
+        Self {
+            title: PLACEHOLDER_TITLE.to_owned(),
+            artist: String::new(),
+            album: String::new(),
+            bundle_id: String::new(),
+            playing: false,
+        }
     }
 
     #[inline]
@@ -72,5 +91,14 @@ mod tests {
     fn title_is_mandatory() {
         assert!(Track::from_parts(None, Some("Band"), None, None, true).is_none());
         assert!(Track::from_parts(Some("   "), Some("Band"), None, None, true).is_none());
+    }
+
+    #[test]
+    fn placeholder_is_paused_bare_title() {
+        let t = Track::placeholder();
+        assert_eq!(t.title, "Play Something");
+        assert!(t.artist.is_empty());
+        assert!(!t.playing);
+        assert_eq!(t.label(" - "), "Play Something");
     }
 }

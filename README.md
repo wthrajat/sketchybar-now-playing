@@ -20,8 +20,8 @@ idles at zero CPU and updates the bar the moment the track changes.
   and grouped in one bracket pill
 * Play, pause, toggle, next and previous controls
 * Left click toggles, right click skips to the next track
-* Sticky last track: full-pill placeholder until the first track, then
-  keeps showing it frozen when idle, never hiding again
+* Sticky last track: full-pill placeholder when idle, real track while
+  playing or paused; scroll runs only while playing, never hiding
 * Native bar scrolling for long titles, on only while playing
 * JSON output and a live change feed for scripting
 
@@ -208,7 +208,7 @@ The sourced wiring script reads these optional variables:
 When the daemon runs, the item updates through events and costs nothing
 while idle. If the daemon is ever absent, the same item falls back to
 `update_freq` polling through `sync`, which pushes label, icon and
-scroll state in one call, freezing on idle instead of hiding. The same
+scroll state in one call, showing the placeholder on idle. The same
 call reconverges a freshly reloaded item within one tick.
 
 ## Configuration
@@ -229,9 +229,9 @@ max_chars = 20
 "com.spotify.client" = ""
 ```
 
-`separator` joins the fields. The bar item is sticky: hidden until the
-first track, then it keeps the last track frozen (`scroll_texts=off`,
-toggle parked on play) when idle. `hide_output` prints an empty line instead of a placeholder from
+`separator` joins the fields. The bar item never hides: idle shows the
+placeholder pill, playing or paused shows the real track (`scroll_texts`
+runs only while playing). `hide_output` prints an empty line instead of a placeholder from
 `get` when nothing plays. `static_icon` pins one glyph
 for every player instead of the per player map. Entries under `[icons]`
 map a player bundle id to a glyph and win over the built ins. To always show
@@ -266,6 +266,9 @@ Every command accepts a global `--config PATH` flag.
 | Prev button  | Previous track       |
 | Play/pause button | Toggle play and pause |
 | Next button  | Skip to next track   |
+
+While the placeholder shows (no player loaded) every click is ignored,
+so a stray toggle can never wake Apple Music.
 
 Set the binary location for clicks with `NOW_PLAYING_BIN` if it is not
 on the default `PATH` inside SketchyBar.

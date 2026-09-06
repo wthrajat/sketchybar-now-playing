@@ -47,7 +47,7 @@ add_main() {
   # buttons are dead until a player exists: clicks fail silently.
   # `scroll_texts` strictly follows PLAYING (on only while playing). The
   # first event or `sync` tick swaps the placeholder for the real track;
-  # idle afterwards freezes the last track instead of hiding.
+  # stopped playback returns to the placeholder instead of hiding.
   sketchybar --add item now_playing "$POS" \
     --set now_playing \
       script="$PLUGIN_DIR/now_playing.sh" \

@@ -1,8 +1,8 @@
 # Field joiner: title{separator}artist. Default is " - ".
 separator = " - "
 # Empty `get` output instead of a placeholder when nothing plays.
-# The bar item is sticky: a placeholder shows until the first track, then
-# it keeps showing the last track frozen (scroll off) when idle, never hiding.
+# The bar item never hides: idle shows the placeholder pill, playing or
+# paused shows the real track (scroll runs only while playing).
 hide_output = false
 # Hint for label sizing; the bar itself truncates via `label.max_chars`.
 max_chars = 20

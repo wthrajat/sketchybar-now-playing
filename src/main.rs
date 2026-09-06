@@ -44,7 +44,10 @@ fn run() -> Result<()> {
     // dead owners are taken over transparently.
     let _daemon_lock = match &cli.command {
         Commands::Daemon { event, set } => match lock::acquire_daemon(event, set.as_deref())? {
-            Some(guard) => Some(guard),
+            Some(guard) => {
+                eprintln!("sketchybar-now-playing: daemon listening for '{event}'");
+                Some(guard)
+            }
             None => {
                 eprintln!("sketchybar-now-playing: daemon already running for this feed");
                 return Ok(());

@@ -72,6 +72,16 @@ local CONTROLS = os.getenv("NOW_PLAYING_CONTROLS") ~= "0"
 -- unlike the shell plugin.
 local playing_state = false
 
+-- Idle fallback text. Keep in sync with Track::PLACEHOLDER_TITLE
+-- (track.rs) and the shell PLACEHOLDER: while the bar shows this, no
+-- player exists, so clicks must not fire media commands (a stray toggle
+-- with no active client wakes Apple Music).
+local PLACEHOLDER = "Play Something"
+
+-- Whether a real track is loaded. False for the placeholder and for empty
+-- payloads from pre-placeholder daemons.
+local has_track = false
+
 local function toggle_glyph(env)
   if env.TOGGLE_ICON ~= nil and env.TOGGLE_ICON ~= "" then
     return env.TOGGLE_ICON
@@ -104,9 +114,10 @@ if CONTROLS then
       icon = { string = def.glyph or ICON_PLAY, padding_left = 8, padding_right = 8 },
     })
     button:subscribe(EVENT, function(env)
-      -- Sticky last track: empty LABEL means idle. Refresh the toggle
-      -- glyph to the paused set but leave `drawing` untouched, so a shown
-      -- bar stays shown frozen and a never-shown bar stays hidden.
+      -- Idle arrives as the placeholder LABEL through the normal path, so
+      -- the toggle parks on play and everything stays drawn. The empty
+      -- branch only serves pre-placeholder daemons: refresh the toggle
+      -- glyph, leave visibility alone.
       if env.LABEL == nil or env.LABEL == "" then
         if def.glyph == nil then
           button:set({ icon = { string = toggle_glyph(env) } })
@@ -119,13 +130,17 @@ if CONTROLS then
     end)
     button:subscribe("mouse.clicked", function()
       -- No optimistic scroll flip: scroll strictly follows PLAYING from
-      -- the event feed and the `sync` tick.
+      -- the event feed and the `sync` tick. Dead while idle: with no
+      -- player a toggle would only wake Apple Music.
+      if not has_track then
+        return
+      end
       sbar.exec(BIN .. CONFIG_FLAG .. " " .. def.action)
     end)
   end
 
   -- The `|` between the label and the buttons. Not clickable.
-  -- Visible from boot; idle leaves it exactly as-is.
+  -- Visible from boot; idle keeps it drawn via the normal path.
   local sep = sbar.add("item", "now_playing.sep", {
     position = "right",
     drawing = true,
@@ -141,9 +156,8 @@ end
 
 -- Placeholder until the first track: the full pill look (music icon,
 -- label, transport buttons), always visible, never scrolling. The buttons
--- are dead until a player exists. The first event or `sync` tick swaps
--- the placeholder for the real track; idle afterwards freezes the last
--- track instead of hiding.
+-- are dead until a player exists. Stopped playback returns to the
+-- placeholder; only true idle maps here, paused tracks keep their entry.
 local now_playing = sbar.add("item", "now_playing", {
   position = "right",
   drawing = true,
@@ -155,15 +169,17 @@ local now_playing = sbar.add("item", "now_playing", {
 
 -- Event path: the daemon pushes TITLE, ARTIST, LABEL, ICON, PLAYING.
 -- Scrolling strictly follows playback: on only while playing, off while
--- paused or idle. Empty LABEL means idle: keep the last label/icon,
--- only stop motion, no `drawing` change (the placeholder stays until the
--- first track).
+-- paused or idle. Idle arrives as the placeholder LABEL and renders
+-- through the normal path; empty payloads (pre-placeholder daemons) only
+-- stop motion.
 now_playing:subscribe(EVENT, function(env)
   if env.LABEL == nil or env.LABEL == "" then
     playing_state = false
+    has_track = false
     now_playing:set({ scroll_texts = false })
   else
     playing_state = (env.PLAYING == "true")
+    has_track = (env.LABEL ~= PLACEHOLDER)
     now_playing:set({
       drawing = true,
       label = { string = env.LABEL },
@@ -188,7 +204,11 @@ sbar.exec(BIN .. CONFIG_FLAG .. " sync now_playing")
 
 -- Left click toggles, right click skips to the next track. No optimistic
 -- scroll flip here either: the event confirms the new PLAYING state.
+-- Dead while idle: with no player a toggle would only wake Apple Music.
 now_playing:subscribe("mouse.clicked", function(env)
+  if not has_track then
+    return
+  end
   if env.BUTTON == "right" then
     sbar.exec(BIN .. CONFIG_FLAG .. " next")
   else

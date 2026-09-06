@@ -80,6 +80,21 @@ set_sep() {
   fi
 }
 
+# Idle fallback text. Keep in sync with Track::PLACEHOLDER_TITLE (track.rs)
+# and the wiring placeholder label: while the bar shows this (or nothing),
+# no player exists.
+PLACEHOLDER="Play Something"
+
+# True when no player exists, so media commands must not fire: a stray
+# toggle with no active client wakes Apple Music. Ground truth is the
+# displayed main-item label; a query failure also blocks (a missed click
+# is harmless, a stray launch is not).
+is_idle() {
+  # $1=base item (callers resolve control siblings to the main item).
+  current="$(sketchybar --query "$1" 2>/dev/null | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["label"]["value"])' 2>/dev/null)" || return 0
+  [ -z "$current" ] || [ "$current" = "$PLACEHOLDER" ]
+}
+
 toggle_glyph() {
   # Daemon payload wins; otherwise derive from playback state so a
   # paused player shows play and a playing one shows pause.
@@ -122,6 +137,16 @@ handle_click() {
   if [ -z "$BIN" ]; then
     return
   fi
+  # Dead clicks when idle: with no player loaded every media command is a
+  # no-op at best and wakes Apple Music at worst. Controls resolve to the
+  # main item, whose label carries the idle state.
+  case "$NAME" in
+    *.sep|*.prev|*.toggle|*.next) base="${NAME%.*}" ;;
+    *) base="$NAME" ;;
+  esac
+  if is_idle "$base"; then
+    return
+  fi
   case "$NAME" in
     *.prev)
       run_bin prev >/dev/null 2>&1
@@ -158,8 +183,8 @@ case "$SENDER" in
     ;;
   forced|"")
     # Post reload convergence (empty $SENDER is the initial run): always
-    # pushes label, icon and scroll state in one call, freezing on idle
-    # instead of hiding, so the shell parses no output.
+    # pushes label, icon and scroll state in one call, showing the
+    # placeholder on idle instead of hiding, so the shell parses no output.
     # Generic over $NAME: `sync` already knows the control suffixes.
     if [ -n "$BIN" ]; then
       run_bin sync "$NAME" >/dev/null 2>&1

@@ -1,11 +1,13 @@
 //! Singleton lock for `daemon` feeds (std only, no new deps).
 //!
-//! One lock file per feed (`--event` name or `--set` target) under `$TMPDIR`.
-//! A second daemon for the same feed exits immediately instead of doubling
-//! steady-state RSS (~33 MB: daemon plus perl helper) and firing every bar
-//! trigger twice. Stale locks from dead owners are taken over; the guard
-//! removes the file on drop. Short-lived commands (`get`, `sync`, controls)
-//! never touch the lock.
+//! One lock file per feed (`--event` name or `--set` target) in `/tmp`,
+//! namespaced by uid. `/tmp` (not `$TMPDIR`) is deliberate: launchd agents
+//! and login shells see different `$TMPDIR`s, so a `$TMPDIR` lock would let
+//! one daemon per context stack up. A second daemon for the same feed exits
+//! immediately instead of doubling steady-state RSS (~33 MB: daemon plus
+//! perl helper) and firing every bar trigger twice. Stale locks from dead
+//! owners are taken over; the guard removes the file on drop. Short-lived
+//! commands (`get`, `sync`, controls) never touch the lock.
 
 use crate::error::{Error, Result};
 use std::{io::Write, path::PathBuf};
@@ -20,28 +22,7 @@ pub struct DaemonLock {
 /// does (caller should exit cleanly). The key is the `--set` target when
 /// present, else the `--event` name, so distinct feeds stay independent.
 pub fn acquire_daemon(event: &str, set: Option<&str>) -> Result<Option<DaemonLock>> {
-    let mut key = String::with_capacity(32);
-    match set {
-        Some(item) => {
-            key.push_str("set-");
-            key.push_str(item);
-        }
-        None => {
-            key.push_str("event-");
-            key.push_str(event);
-        }
-    }
-    let safe: String = key
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    let path = std::env::temp_dir().join(format!("sketchybar-now-playing.{safe}.lock"));
+    let path = lock_path(event, set);
     let me = std::process::id();
 
     // Fast path: atomic create wins the feed.
@@ -67,6 +48,31 @@ pub fn acquire_daemon(event: &str, set: Option<&str>) -> Result<Option<DaemonLoc
     }
 }
 
+fn lock_path(event: &str, set: Option<&str>) -> PathBuf {
+    let mut key = String::with_capacity(32);
+    match set {
+        Some(item) => {
+            key.push_str("set-");
+            key.push_str(item);
+        }
+        None => {
+            key.push_str("event-");
+            key.push_str(event);
+        }
+    }
+    let safe: String = key
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    PathBuf::from(format!("/tmp/sketchybar-now-playing-{}.{safe}.lock", uid()))
+}
+
 fn create_with_pid(path: &PathBuf, pid: u32) -> std::io::Result<()> {
     let mut file = std::fs::OpenOptions::new()
         .write(true)
@@ -74,6 +80,19 @@ fn create_with_pid(path: &PathBuf, pid: u32) -> std::io::Result<()> {
         .open(path)?;
     file.write_all(pid.to_string().as_bytes())?;
     Ok(())
+}
+
+/// Numeric uid for lock namespacing (one spawn, daemon startup only).
+/// Falls back to `unknown` rather than failing startup.
+fn uid() -> String {
+    std::process::Command::new("/usr/bin/id")
+        .arg("-u")
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))
+        .unwrap_or_else(|| "unknown".to_owned())
 }
 
 fn owner_pid(path: &PathBuf) -> Option<u32> {
@@ -134,7 +153,7 @@ mod tests {
     }
 
     fn lock_path_for(event: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("sketchybar-now-playing.event-{event}.lock"))
+        lock_path(event, None)
     }
 
     #[test]
@@ -177,7 +196,6 @@ mod tests {
         let by_set = acquire_daemon("ignored", Some(&key)).expect("set feed acquires");
         assert!(by_set.is_some());
         drop(by_set);
-        let path = std::env::temp_dir().join(format!("sketchybar-now-playing.set-{key}.lock"));
-        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(lock_path(&key, Some(&key)));
     }
 }

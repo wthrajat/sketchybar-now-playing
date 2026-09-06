@@ -24,35 +24,33 @@ fn resolve_icon<'a>(cfg: &'a Config, bundle_id: &str) -> &'a str {
 }
 
 /// Fire a custom event. Uppercase keys; direct exec, no shell.
+/// Idle (`None`) renders the placeholder pill through the same path, so the
+/// bar never shows a stale track and never hides.
 pub fn trigger(event: &str, track: Option<&Track>, cfg: &Config) -> Result<()> {
-    let mut cmd = Command::new("sketchybar");
-    cmd.arg("--trigger").arg(event);
-    match track {
-        Some(t) => {
-            let label = t.label(&cfg.separator);
-            let icon = resolve_icon(cfg, &t.bundle_id);
-            let toggle = toggle_icon(t.playing);
-            cmd.arg(format!("TITLE={}", t.title))
-                .arg(format!("ARTIST={}", t.artist))
-                .arg(format!("ALBUM={}", t.album))
-                .arg(format!("BUNDLE={}", t.bundle_id))
-                .arg(format!("PLAYING={}", t.playing))
-                .arg(format!("LABEL={label}"))
-                .arg(format!("ICON={icon}"))
-                .arg(format!("PREV_ICON={ICON_PREV}"))
-                .arg(format!("TOGGLE_ICON={toggle}"))
-                .arg(format!("NEXT_ICON={ICON_NEXT}"));
-        }
+    let placeholder;
+    let t = match track {
+        Some(t) => t,
         None => {
-            cmd.arg("PLAYING=false")
-                .arg("LABEL=")
-                .arg("ICON=")
-                .arg(format!("PREV_ICON={ICON_PREV}"))
-                .arg(format!("TOGGLE_ICON={}", toggle_icon(false)))
-                .arg(format!("NEXT_ICON={ICON_NEXT}"));
+            placeholder = Track::placeholder();
+            &placeholder
         }
-    }
-    let status = cmd
+    };
+    let label = t.label(&cfg.separator);
+    let icon = resolve_icon(cfg, &t.bundle_id);
+    let toggle = toggle_icon(t.playing);
+    let status = Command::new("sketchybar")
+        .arg("--trigger")
+        .arg(event)
+        .arg(format!("TITLE={}", t.title))
+        .arg(format!("ARTIST={}", t.artist))
+        .arg(format!("ALBUM={}", t.album))
+        .arg(format!("BUNDLE={}", t.bundle_id))
+        .arg(format!("PLAYING={}", t.playing))
+        .arg(format!("LABEL={label}"))
+        .arg(format!("ICON={icon}"))
+        .arg(format!("PREV_ICON={ICON_PREV}"))
+        .arg(format!("TOGGLE_ICON={toggle}"))
+        .arg(format!("NEXT_ICON={ICON_NEXT}"))
         .status()
         .map_err(|e| Error::SketchyBar(format!("spawn sketchybar --trigger: {e}")))?;
     if status.success() {
@@ -68,65 +66,55 @@ fn push_set(cmd: &mut Command, item: &str, track: Option<&Track>, cfg: &Config) 
         push_set_control(cmd, item, kind, track);
         return;
     }
-    cmd.arg("--set").arg(item);
-    match track {
-        Some(t) => {
-            let label = t.label(&cfg.separator);
-            let icon = resolve_icon(cfg, &t.bundle_id);
-            let scroll = if t.playing {
-                "scroll_texts=on"
-            } else {
-                "scroll_texts=off"
-            };
-            cmd.arg(format!("label={label}"))
-                .arg(format!("icon={icon}"))
-                .arg(scroll)
-                .arg("drawing=on");
-        }
+    // Idle renders the placeholder through the same path: standard icon,
+    // no scroll, always drawn. Paused tracks keep their real entry.
+    let placeholder;
+    let t = match track {
+        Some(t) => t,
         None => {
-            // Sticky last track: never clear label/icon or hide. Only stop
-            // motion; scroll strictly follows `playing`. No `drawing`
-            // change, so the wiring-time placeholder stays until the
-            // first track.
-            cmd.arg("scroll_texts=off");
+            placeholder = Track::placeholder();
+            &placeholder
         }
-    }
+    };
+    let label = t.label(&cfg.separator);
+    let icon = resolve_icon(cfg, &t.bundle_id);
+    let scroll = if t.playing {
+        "scroll_texts=on"
+    } else {
+        "scroll_texts=off"
+    };
+    cmd.arg("--set")
+        .arg(item)
+        .arg(format!("label={label}"))
+        .arg(format!("icon={icon}"))
+        .arg(scroll)
+        .arg("drawing=on");
 }
 
 #[inline]
 fn push_set_control(cmd: &mut Command, item: &str, kind: &str, track: Option<&Track>) {
-    cmd.arg("--set").arg(item);
-    match track {
-        Some(t) => {
-            if kind == ".sep" {
-                cmd.arg("label=|").arg("icon.drawing=off");
-            } else {
-                let icon = match kind {
-                    ".prev" => ICON_PREV,
-                    ".next" => ICON_NEXT,
-                    _ => toggle_icon(t.playing),
-                };
-                cmd.arg(format!("icon={icon}")).arg("label.drawing=off");
-            }
-            cmd.arg("drawing=on");
-        }
+    // Idle parks the toggle on play through the same path; the whole pill
+    // stays drawn, so placeholder and controls are always visible together.
+    let placeholder;
+    let t = match track {
+        Some(t) => t,
         None => {
-            // Idle: keep the last track visible, freeze motion, park the
-            // toggle on play. Glyphs refresh to the paused set but `drawing`
-            // is untouched, so the placeholder and controls stay exactly as
-            // the wiring left them until the first track.
-            if kind == ".sep" {
-                cmd.arg("label=|").arg("icon.drawing=off");
-            } else {
-                let icon = match kind {
-                    ".prev" => ICON_PREV,
-                    ".next" => ICON_NEXT,
-                    _ => toggle_icon(false),
-                };
-                cmd.arg(format!("icon={icon}")).arg("label.drawing=off");
-            }
+            placeholder = Track::placeholder();
+            &placeholder
         }
+    };
+    cmd.arg("--set").arg(item);
+    if kind == ".sep" {
+        cmd.arg("label=|").arg("icon.drawing=off");
+    } else {
+        let icon = match kind {
+            ".prev" => ICON_PREV,
+            ".next" => ICON_NEXT,
+            _ => toggle_icon(t.playing),
+        };
+        cmd.arg(format!("icon={icon}")).arg("label.drawing=off");
     }
+    cmd.arg("drawing=on");
 }
 
 #[inline]
