@@ -11,6 +11,11 @@ Control Center.
 One small Rust binary plus two shell scripts. It is event driven, so it
 idles at zero CPU and updates the bar the moment the track changes.
 
+Bar:
+<hr>
+<img width="1620" height="204" alt="image" src="https://github.com/user-attachments/assets/b5120d90-9a57-4717-b107-9b29a4b925e8" />
+<hr>
+
 ![Demo](./public/assets/now-playing-demo.gif)
 
 ## Features
