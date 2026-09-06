@@ -86,7 +86,8 @@ fn push_set(cmd: &mut Command, item: &str, track: Option<&Track>, cfg: &Config) 
         None => {
             // Sticky last track: never clear label/icon or hide. Only stop
             // motion; scroll strictly follows `playing`. No `drawing`
-            // change preserves hidden-until-first-play.
+            // change, so the wiring-time placeholder stays until the
+            // first track.
             cmd.arg("scroll_texts=off");
         }
     }
@@ -112,8 +113,8 @@ fn push_set_control(cmd: &mut Command, item: &str, kind: &str, track: Option<&Tr
         None => {
             // Idle: keep the last track visible, freeze motion, park the
             // toggle on play. Glyphs refresh to the paused set but `drawing`
-            // is untouched so a never-shown bar stays hidden and a shown
-            // bar stays shown.
+            // is untouched, so the placeholder and controls stay exactly as
+            // the wiring left them until the first track.
             if kind == ".sep" {
                 cmd.arg("label=|").arg("icon.drawing=off");
             } else {

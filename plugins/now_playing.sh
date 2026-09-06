@@ -42,8 +42,8 @@ run_bin() {
 set_label() {
   # $1=label $2=icon $3=playing ("true" scrolls, anything else stays put).
   # Sticky last track: empty label means idle, never hide. Keep the previous
-  # label/icon, only stop motion. No `drawing` change preserves
-  # hidden-until-first-play.
+  # label/icon, only stop motion. No `drawing` change, so the wiring-time
+  # placeholder stays until the first track.
   if [ -z "$1" ]; then
     sketchybar --set "$NAME" scroll_texts=off
   elif [ "$3" = "true" ]; then
@@ -62,8 +62,8 @@ ICON_NEXT=""
 
 set_control() {
   # $1=icon. Sticky: idle (empty $LABEL) refreshes the glyph to the paused
-  # set but leaves `drawing` untouched, so a shown bar stays shown frozen
-  # and a never-shown bar stays hidden.
+  # set but leaves `drawing` untouched, so the placeholder and controls
+  # stay exactly as the wiring left them until the first track.
   if [ -z "${LABEL:-}" ]; then
     sketchybar --set "$NAME" icon="$1"
   else

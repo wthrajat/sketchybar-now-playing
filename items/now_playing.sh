@@ -35,19 +35,28 @@ MAX="${NOW_PLAYING_MAX:-40}"
 CONTROLS="${NOW_PLAYING_CONTROLS:-1}"
 PLUGIN_DIR="$(cd "$(dirname "$0")/../plugins" && pwd)"
 
+# Placeholder faces (Nerd Font codepoints, same as icons.rs). Byte escapes
+# instead of literals so the file stays plain ASCII in any editor.
+ICON_DEFAULT="$(printf '\357\200\201')"
+
 sketchybar --add event "$EVENT"
 
 add_main() {
-  # Starts hidden and still: hidden-until-first-track, and `scroll_texts`
-  # strictly follows PLAYING (on only while playing). The event and the
-  # `sync` tick reveal (drawing=on) and animate it.
+  # Placeholder until the first track: the full pill look (music icon,
+  # label, transport buttons), always visible, never scrolling. The
+  # buttons are dead until a player exists: clicks fail silently.
+  # `scroll_texts` strictly follows PLAYING (on only while playing). The
+  # first event or `sync` tick swaps the placeholder for the real track;
+  # idle afterwards freezes the last track instead of hiding.
   sketchybar --add item now_playing "$POS" \
     --set now_playing \
       script="$PLUGIN_DIR/now_playing.sh" \
       click_script="$PLUGIN_DIR/now_playing.sh" \
       update_freq=10 \
       scroll_texts=off \
-      drawing=off \
+      drawing=on \
+      label="Play Something" \
+      icon="$ICON_DEFAULT" \
       label.max_chars="$MAX" \
       label.scroll_duration=100 \
     --subscribe now_playing "$EVENT" mouse.clicked
@@ -58,13 +67,12 @@ add_control() {
   # button is icon only. Same event/click plumbing as the main item;
   # the plugin tells siblings apart via $NAME. No update_freq: buttons
   # are purely event driven, and the main item's `sync` tick fans out
-  # to them, so they converge without polling. Starts hidden; the first
-  # track reveals it, idle never hides it again.
+  # to them, so they converge without polling. Visible from boot next to
+  # the placeholder; idle events park the toggle on play.
   sketchybar --add item "now_playing.$1" "$POS" \
     --set "now_playing.$1" \
       script="$PLUGIN_DIR/now_playing.sh" \
       click_script="$PLUGIN_DIR/now_playing.sh" \
-      drawing=off \
       label.drawing=off \
       icon="$2" \
       icon.padding_left=8 \
@@ -75,11 +83,10 @@ add_control() {
 add_sep() {
   # The `|` between the label and the buttons. Not clickable, never
   # polled: same event plus fan-out convergence as the buttons.
-  # Starts hidden; idle leaves it as-is.
+  # Visible from boot; idle leaves it as-is.
   sketchybar --add item now_playing.sep "$POS" \
     --set now_playing.sep \
       script="$PLUGIN_DIR/now_playing.sh" \
-      drawing=off \
       label="|" \
       icon.drawing=off \
     --subscribe now_playing.sep "$EVENT"

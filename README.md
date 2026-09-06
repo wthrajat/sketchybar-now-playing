@@ -20,8 +20,8 @@ idles at zero CPU and updates the bar the moment the track changes.
   and grouped in one bracket pill
 * Play, pause, toggle, next and previous controls
 * Left click toggles, right click skips to the next track
-* Sticky last track: hidden until the first track, then keeps showing it
-  frozen when idle, never hiding again
+* Sticky last track: full-pill placeholder until the first track, then
+  keeps showing it frozen when idle, never hiding again
 * Native bar scrolling for long titles, on only while playing
 * JSON output and a live change feed for scripting
 

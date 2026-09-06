@@ -54,10 +54,14 @@ sbar.add("event", EVENT)
 
 -- Transport glyphs (Nerd Font set, same as icons.rs). The daemon event
 -- carries the live TOGGLE_ICON; these are the pre-event / fallback faces.
-local ICON_PREV = ""
-local ICON_PLAY = ""
-local ICON_PAUSE = ""
-local ICON_NEXT = ""
+-- Decimal byte escapes (UTF-8) instead of literals so the file stays plain
+-- ASCII in any editor: F001 music note, F048 prev, F04B play, F04C pause,
+-- F051 next.
+local ICON_DEFAULT = "\239\128\129"
+local ICON_PREV = "\239\129\136"
+local ICON_PLAY = "\239\129\139"
+local ICON_PAUSE = "\239\129\140"
+local ICON_NEXT = "\239\129\145"
 
 -- Set to 0 to keep the single track item with no transport buttons.
 local CONTROLS = os.getenv("NOW_PLAYING_CONTROLS") ~= "0"
@@ -91,10 +95,11 @@ if CONTROLS then
   for _, def in ipairs(control_defs) do
     -- No update_freq and no routine tick: buttons are purely event
     -- driven, and the main item's `sync` tick fans out to them.
-    -- Starts hidden; the first track reveals it, idle never hides it.
+    -- Visible from boot next to the placeholder; idle events park the
+    -- toggle on play. Dead until a player exists: clicks fail silently.
     local button = sbar.add("item", def.name, {
       position = "right",
-      drawing = false,
+      drawing = true,
       label = { drawing = false },
       icon = { string = def.glyph or ICON_PLAY, padding_left = 8, padding_right = 8 },
     })
@@ -120,10 +125,10 @@ if CONTROLS then
   end
 
   -- The `|` between the label and the buttons. Not clickable.
-  -- Starts hidden; idle leaves it exactly as-is.
+  -- Visible from boot; idle leaves it exactly as-is.
   local sep = sbar.add("item", "now_playing.sep", {
     position = "right",
-    drawing = false,
+    drawing = true,
     label = { string = "|" },
     icon = { drawing = false },
   })
@@ -134,18 +139,25 @@ if CONTROLS then
   end)
 end
 
+-- Placeholder until the first track: the full pill look (music icon,
+-- label, transport buttons), always visible, never scrolling. The buttons
+-- are dead until a player exists. The first event or `sync` tick swaps
+-- the placeholder for the real track; idle afterwards freezes the last
+-- track instead of hiding.
 local now_playing = sbar.add("item", "now_playing", {
   position = "right",
-  drawing = false,
+  drawing = true,
   update_freq = 10,
   scroll_texts = false,
-  label = { max_chars = 40, scroll_duration = 100 },
+  label = { string = "Play Something", max_chars = 40, scroll_duration = 100 },
+  icon = { string = ICON_DEFAULT },
 })
 
 -- Event path: the daemon pushes TITLE, ARTIST, LABEL, ICON, PLAYING.
 -- Scrolling strictly follows playback: on only while playing, off while
 -- paused or idle. Empty LABEL means idle: keep the last label/icon,
--- only stop motion, no `drawing` change (hidden-until-first-play).
+-- only stop motion, no `drawing` change (the placeholder stays until the
+-- first track).
 now_playing:subscribe(EVENT, function(env)
   if env.LABEL == nil or env.LABEL == "" then
     playing_state = false
